@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>Adsefid.Sdk</RootNamespace>
+    <AssemblyName>Adsefid.Sdk</AssemblyName>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PackageId>Adsefid.Sdk</PackageId>
+    <Version>0.1.0</Version>
+    <Description>A .NET client SDK for the adsefid.com SMS Web Service REST API: SMS, Messenger and User endpoints, plus outgoing webhook signature verification.</Description>
+    <Authors>adsefid.com</Authors>
+    <PackageTags>adsefid;sms;messenger;webservice;sdk</PackageTags>
+    <RepositoryUrl>https://github.com/adsefid/sdk-dotnet</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>
