@@ -142,8 +142,19 @@ catch (AdsefidTransportException ex)
 }
 ```
 
-`AdsefidApiException.Details` is a loosely-typed `JsonElement?` because its shape is endpoint-specific
-(a validation map keyed by snake_case field path, a bulk item list, a cancel-specific map, or absent).
+`AdsefidApiException.Details` is a loosely-typed `JsonElement?` because its shape is endpoint-specific.
+
+`details` is not one shape — the service picks one per endpoint:
+
+| When | Shape | Example |
+|---|---|---|
+| Request validation (`2024 INVALID_PARAMETER`) | `{"errors": {field: message}}` — snake_case field paths, **string** values | `{"errors":{"take":"invalid value for take"}}` |
+| Single send | `{field: message}` — flat, no wrapper | `{"receptor":"invalid value for receptor"}` |
+| Bulk / P2P | `{"errors": {...}, "messages": [{"index": n, "errors": {...}}]}` — `index` is the position in *your* array, so gaps are normal | `{"errors":{},"messages":[{"index":2,"errors":{"local_id":"invalid value for local_id"}}]}` |
+| Cancel | `{field: [value, ...]}` — the one shape whose values are **arrays** | `{"local_ids":["order-10001"]}` |
+| Anything else | absent or `null` | |
+
+Decode it defensively for the endpoint you called rather than assuming a single shape.
 
 Bulk and P2P send endpoints have partial-success semantics: an HTTP 200 with `status: "success"` can
 still contain some failed items. These are **not** exceptions — they come back as a normal typed
@@ -166,7 +177,42 @@ unparseable body — surface as `AdsefidRateLimitException` (which derives from 
 
 `AdsefidApiException.Code` is parsed permissively: an unrecognized numeric code becomes
 `(WebServiceResponseCode)rawInt` instead of throwing, so the SDK degrades gracefully as the API adds
-new codes over time.
+new codes over time. `TemplateParameterType` covers the documented set only — the live service also
+emits an undocumented third value, and such a parameter is dropped from `UserTemplate.Parameters`
+rather than surfaced as an enum member that does not exist.
+
+## Template parameters, leading zeros and decimals
+
+`TemplateParameterValue` holds either a string or a number, with implicit conversions from
+`string`, `int`, `long`, `decimal`, and `double`. A parameter the template declares as `number` may
+be sent **either** as a JSON number or as a JSON string, and the service substitutes a numeric
+string verbatim — so a string is the only way to keep a value's exact digits:
+
+```csharp
+await client.Sms.SendTemplateAsync(new SendTemplateSmsRequest
+{
+    TemplateId = "invoice_notice",
+    Parameters = new Dictionary<string, TemplateParameterValue>
+    {
+        ["invoice"] = "001234", // renders as 001234 — the number 1234 would lose the zeros
+        ["amount"]  = "1.50",   // renders as 1.50   — the number 1.5 would lose the zero
+        ["count"]   = 2,        // an ordinary integer
+        ["rate"]    = 19.99m,   // a decimal, which round-trips exactly
+    },
+    Receptor = "09120000000",
+    LineNumber = "3000xxxx",
+});
+```
+
+Numbers are held as `decimal`, so an ordinary decimal survives a round trip that `double` would
+have perturbed; reading one back gives `value.AsNumber`, and a string gives `value.AsString`. Reach
+for a string whenever the rendered text must match the digits you supplied — invoice and account
+numbers, zero-padded codes, and money amounts with a fixed number of decimal places.
+
+A `default(TemplateParameterValue)` was never assigned and is not a usable value: serializing one
+throws rather than silently emitting JSON `null`.
+
+See [`examples/Templates`](examples/Templates) for a runnable version.
 
 ## File upload example
 
@@ -256,15 +302,59 @@ assume every deployment gets all three; handle whichever ones you've subscribed 
 
 A runnable minimal API version of this is in [`examples/WebhookReceiver`](examples/WebhookReceiver).
 
+### The signing secret is Base64
+
+Your endpoint's signing secret is shown in the adsefid.com panel as the Base64 encoding of 32
+random bytes, and the service signs with **those raw bytes** — not with the text of the Base64
+string. Pass the secret exactly as the panel shows it and `WebhookVerifier.VerifyAndParse` decodes
+it for you; a secret that is not valid Base64 throws `AdsefidWebhookVerificationException`. If you
+already hold the decoded key, use the overload that takes a `ReadOnlySpan<byte>`.
+
+## Development
+
+```bash
+make deps    # dotnet restore
+make fmt     # dotnet format
+make lint    # dotnet format --verify-no-changes --severity warn
+make build   # dotnet build -c Release
+make test    # dotnet test -c Release --no-build
+```
+
+The suite is xUnit, under `tests/Adsefid.Sdk.Tests`. It drives the public `AdsefidClient` through a
+fake `HttpMessageHandler` supplied via `AdsefidClientOptions.HttpClient`, and reaches the internal
+pure helpers (`Validation`, `CsvHelper`, `Limits`) through `InternalsVisibleTo`. Golden fixtures
+under `tests/Adsefid.Sdk.Tests/fixtures` are byte-identical to the same tree in the sibling SDK
+repositories, and `FixturesIntegrityTests` verifies them against `CHECKSUMS.txt`.
+
+### Examples
+
+Every directory under `examples/` is a runnable console project, excluded from the NuGet package
+via `<IsPackable>false</IsPackable>`:
+
+```bash
+export ADSEFID_API_KEY=...
+export ADSEFID_LINE_NUMBER=3000xxxx
+
+dotnet run --project examples/Account          # account info, lines, profiles, templates; client config
+dotnet run --project examples/Quickstart       # send one SMS, with full error triage
+dotnet run --project examples/BulkAndP2P       # bulk + P2P sends, and reading a partial success
+dotnet run --project examples/Templates        # list templates and send one, incl. exact numeric values
+dotnet run --project examples/StatusAndCancel  # delivery status, cancelling, inbound messages
+dotnet run --project examples/Messenger        # upload an attachment and send it via a messenger profile
+dotnet run --project examples/WebhookReceiver  # verify and dispatch inbound webhooks
+```
+
+`examples/Account` sends nothing, so it is the safest one to try first.
+
 ## Versioning
 
 This SDK follows Semantic Versioning independently of the API documentation.
 
-- SDK version: **`0.2.0`** (`<Version>` in `Adsefid.Sdk.csproj`)
+- SDK version: **`0.3.0`** (`<Version>` in `Adsefid.Sdk.csproj`)
 - Verified API documentation: **`v1.11.0`**
 
 SDK releases use `v<SDK_VERSION>` tags. The two version numbers move independently.
 
 ## License
 
-Proprietary — All rights reserved.
+MIT — see [LICENSE](LICENSE).

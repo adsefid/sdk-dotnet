@@ -63,7 +63,31 @@ an ambiguous doc reading:
 
 ## Hard rules
 
-- No test project, ever. This repo ships an SDK, not a test suite for one.
+- **Every change ships with tests.** `tests/Adsefid.Sdk.Tests` is xUnit (`make test`). Transport
+  behaviour is driven through the public `AdsefidClient` with a fake `HttpMessageHandler` supplied
+  via `AdsefidClientOptions.HttpClient`; the internal pure helpers (`Validation`, `CsvHelper`,
+  `Limits`) are reached through the `InternalsVisibleTo` in `Directory.Build.props`. Do not test
+  `RequestExecutor` or the internal resource constructors directly — go through the public surface,
+  which is what a consumer sees.
+- **Golden fixtures are shared across all five SDKs.** `tests/Adsefid.Sdk.Tests/fixtures` is
+  byte-identical to the same tree in the sibling repositories. Never edit one in isolation: change
+  it in all five and regenerate every `CHECKSUMS.txt`, or `FixturesIntegrityTests` fails.
+- **`.editorconfig` requires `utf-8-bom`.** A new `.cs` file without a BOM fails `make lint`.
+- **No magic limits.** Every request bound lives in `Http/Limits.cs` and is referenced by name.
+- **Template parameter values.** `TemplateParameterValue` stores numbers as `decimal`, so an exact
+  decimal round-trips. A `number` parameter may legitimately travel as a JSON *string* — that is how
+  leading zeros (`"001234"`) and exact decimals (`"1.50"`) reach the service intact, since it
+  substitutes a numeric string verbatim. Its `default` is a distinct unassigned state that refuses
+  to serialize; do not "simplify" that away.
+- **The webhook secret is Base64.** A webhook endpoint's secret is 32 random bytes shown
+  Base64-encoded in the panel, and the service signs with the **decoded** bytes.
+  `WebhookVerifier.VerifyAndParse` decodes before keying the HMAC, and has a `ReadOnlySpan<byte>`
+  overload for a pre-decoded key. Keying the HMAC with the UTF-8 bytes of the Base64 string does not
+  verify against the live service.
+- **Request bodies omit nulls.** `AdsefidJsonContext` sets
+  `DefaultIgnoreCondition = WhenWritingNull`, so an unset optional is absent from the body rather
+  than an explicit `null`, matching the sibling SDKs.
+
 - No reflection-based JSON, ever. Every serializable type must be registered on
   `AdsefidJsonContext`; if `dotnet build` doesn't fail but a type silently falls back to reflection,
   that's a bug — check the `[JsonSerializable]` list first.

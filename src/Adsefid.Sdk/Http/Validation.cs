@@ -8,9 +8,14 @@ internal static partial class Validation
     [GeneratedRegex(@"^[A-Za-z0-9]([A-Za-z0-9\-_.:]{0,34}[A-Za-z0-9])?$")]
     internal static partial Regex LocalIdPattern();
 
+    /// <summary>
+    /// Validates an optional local id. The service normalizes a blank value to
+    /// "not supplied" before validating, so <see langword="null"/>, empty and
+    /// whitespace-only are all accepted and simply omitted from the request.
+    /// </summary>
     public static void ValidateLocalId(string? localId, string fieldName)
     {
-        if (localId is null)
+        if (string.IsNullOrWhiteSpace(localId))
         {
             return;
         }
@@ -38,6 +43,11 @@ internal static partial class Validation
         }
     }
 
+    /// <summary>
+    /// Enforces a maximum length in UTF-16 code units, which is what the service
+    /// counts. <see cref="string.Length"/> is already that measure in .NET, so a
+    /// character outside the Basic Multilingual Plane correctly costs two.
+    /// </summary>
     public static void RequireMaxLength(string value, int maxLength, string fieldName)
     {
         if (value.Length > maxLength)

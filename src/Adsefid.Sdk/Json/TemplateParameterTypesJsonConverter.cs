@@ -27,17 +27,17 @@ internal sealed class TemplateParameterTypesJsonConverter : JsonConverter<IReadO
                 throw new JsonException("Template parameter type was expected.");
             }
 
-            if (reader.TokenType == JsonTokenType.String)
-            {
-                switch (reader.GetString())
-                {
-                    case "string": result[name] = TemplateParameterType.String; break;
-                    case "number": result[name] = TemplateParameterType.Number; break;
-                }
-            }
-            else
+            if (reader.TokenType != JsonTokenType.String)
             {
                 reader.Skip();
+                continue;
+            }
+
+            // Drop a parameter whose declared type this SDK does not model, so
+            // the dictionary never holds a value callers cannot switch on.
+            if (TemplateParameterTypeJsonConverter.TryParse(reader.GetString()) is { } parameterType)
+            {
+                result[name] = parameterType;
             }
         }
 
@@ -49,13 +49,9 @@ internal sealed class TemplateParameterTypesJsonConverter : JsonConverter<IReadO
         writer.WriteStartObject();
         foreach (var (name, type) in value)
         {
-            writer.WriteString(name, type switch
-            {
-                TemplateParameterType.String => "string",
-                TemplateParameterType.Number => "number",
-                _ => throw new JsonException($"Unknown TemplateParameterType value '{type}'."),
-            });
+            writer.WriteString(name, TemplateParameterTypeJsonConverter.ToWireValue(type));
         }
+
         writer.WriteEndObject();
     }
 }

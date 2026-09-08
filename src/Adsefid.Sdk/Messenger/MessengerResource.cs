@@ -31,7 +31,7 @@ public sealed class MessengerResource
     {
         ArgumentNullException.ThrowIfNull(request);
         Validation.RequireNonEmpty(request.Message, nameof(request.Message));
-        Validation.RequireMaxLength(request.Message, 4000, nameof(request.Message));
+        Validation.RequireMaxLength(request.Message, Limits.MessengerMessageMaxLength, nameof(request.Message));
         Validation.RequireNonEmpty(request.Receptor, nameof(request.Receptor));
         Validation.RequireNonEmpty(request.Profile, nameof(request.Profile));
         Validation.ValidateLocalId(request.LocalId, nameof(request.LocalId));
@@ -55,7 +55,7 @@ public sealed class MessengerResource
         ArgumentNullException.ThrowIfNull(request);
         Validation.RequireNonEmptyCollection(request.Receptors, nameof(request.Receptors));
         Validation.RequireNonEmpty(request.Message, nameof(request.Message));
-        Validation.RequireMaxLength(request.Message, 4000, nameof(request.Message));
+        Validation.RequireMaxLength(request.Message, Limits.MessengerMessageMaxLength, nameof(request.Message));
         Validation.RequireNonEmpty(request.Profile, nameof(request.Profile));
 
         foreach (var receptor in request.Receptors)
@@ -89,7 +89,7 @@ public sealed class MessengerResource
         {
             Validation.RequireNonEmpty(receptor.Receptor, nameof(receptor.Receptor));
             Validation.RequireNonEmpty(receptor.Message, nameof(receptor.Message));
-            Validation.RequireMaxLength(receptor.Message, 4000, nameof(receptor.Message));
+            Validation.RequireMaxLength(receptor.Message, Limits.MessengerMessageMaxLength, nameof(receptor.Message));
             Validation.ValidateLocalId(receptor.LocalId, nameof(receptor.LocalId));
         }
 
