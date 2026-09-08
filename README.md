@@ -66,6 +66,9 @@ var client = new AdsefidClient(new AdsefidClientOptions
     // Override the base URL (defaults to "https://api.adsefid.com")
     BaseUrl = "https://api.adsefid.com",
 
+    // Defaults to "adsefid-dotnet/<SDK_VERSION>".
+    UserAgent = "my-service/1.0.0",
+
     // Supply your own HttpClient, e.g. one created via IHttpClientFactory.
     // When omitted, the SDK lazily creates and caches a default HttpClient
     // per (BaseUrl, ApiKey) pair, with BaseAddress and the X-API-KEY header
@@ -76,6 +79,8 @@ var client = new AdsefidClient(new AdsefidClientOptions
 
 To control timeouts, configure them on the `HttpClient` you supply (`HttpClient.Timeout`, or via
 `IHttpClientFactory` handler configuration) — the SDK does not impose its own timeout.
+
+Monetary response properties (`Cost`, `TotalCost`, and `CreditLeft`) use `decimal` and may contain fractional values.
 
 ## Resource reference
 
@@ -255,7 +260,7 @@ A runnable minimal API version of this is in [`examples/WebhookReceiver`](exampl
 
 This SDK follows Semantic Versioning independently of the API documentation.
 
-- SDK version: **`0.1.0`** (`<Version>` in `Adsefid.Sdk.csproj`)
+- SDK version: **`0.2.0`** (`<Version>` in `Adsefid.Sdk.csproj`)
 - Verified API documentation: **`v1.11.0`**
 
 SDK releases use `v<SDK_VERSION>` tags. The two version numbers move independently.

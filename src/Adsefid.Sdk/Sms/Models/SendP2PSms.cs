@@ -61,7 +61,7 @@ public sealed class SendP2PSmsResponse
 
     /// <summary>Total cost charged across all messages in this send.</summary>
     [JsonPropertyName("total_cost")]
-    public required long TotalCost { get; init; }
+    public required decimal TotalCost { get; init; }
 
     /// <summary>Breakdown of message counts by outcome.</summary>
     [JsonPropertyName("counts")]
@@ -96,5 +96,5 @@ public sealed class P2PSmsMessageResult
     public required int SegmentCount { get; init; }
 
     [JsonPropertyName("cost")]
-    public required long Cost { get; init; }
+    public required decimal Cost { get; init; }
 }

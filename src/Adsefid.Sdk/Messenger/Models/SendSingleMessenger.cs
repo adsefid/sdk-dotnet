@@ -56,7 +56,7 @@ public sealed class SendSingleMessengerResponse
     public required bool Hide { get; init; }
 
     [JsonPropertyName("cost")]
-    public required long Cost { get; init; }
+    public required decimal Cost { get; init; }
 
     [JsonPropertyName("send_time")]
     public DateTimeOffset? SendTime { get; init; }

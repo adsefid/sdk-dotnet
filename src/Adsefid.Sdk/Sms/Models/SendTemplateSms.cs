@@ -63,7 +63,7 @@ public sealed class SendTemplateSmsResponse
     public LineSelector LineSelector { get; init; }
 
     [JsonPropertyName("cost")]
-    public required long Cost { get; init; }
+    public required decimal Cost { get; init; }
 
     [JsonPropertyName("receptor")]
     public required string Receptor { get; init; }

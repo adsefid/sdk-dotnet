@@ -20,7 +20,8 @@ public sealed class AdsefidClient
     /// <summary>Creates a client from the given <paramref name="options"/>.</summary>
     /// <exception cref="AdsefidValidationException">
     /// <see cref="AdsefidClientOptions.ApiKey"/> is blank, or
-    /// <see cref="AdsefidClientOptions.BaseUrl"/> is not an absolute HTTP(S) URL.
+    /// <see cref="AdsefidClientOptions.BaseUrl"/> is not an absolute HTTP(S) URL, or
+    /// <see cref="AdsefidClientOptions.UserAgent"/> is blank or contains a line break.
     /// </exception>
     public AdsefidClient(AdsefidClientOptions options)
     {
@@ -37,7 +38,18 @@ public sealed class AdsefidClient
             throw new AdsefidValidationException("'BaseUrl' must be an absolute HTTP or HTTPS URL.");
         }
 
-        var executor = new RequestExecutor(options.HttpClient ?? DefaultHttpClient, baseUri, options.ApiKey);
+        if (string.IsNullOrWhiteSpace(options.UserAgent)
+            || options.UserAgent.Contains('\r')
+            || options.UserAgent.Contains('\n'))
+        {
+            throw new AdsefidValidationException("'UserAgent' must be non-blank and contain no line breaks.");
+        }
+
+        var executor = new RequestExecutor(
+            options.HttpClient ?? DefaultHttpClient,
+            baseUri,
+            options.ApiKey,
+            options.UserAgent);
 
         Sms = new SmsResource(executor);
         Messenger = new MessengerResource(executor);
