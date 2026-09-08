@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>Adsefid.Sdk.DependencyInjection</RootNamespace>
+    <AssemblyName>Adsefid.Sdk.DependencyInjection</AssemblyName>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PackageId>Adsefid.Sdk.DependencyInjection</PackageId>
+    <Version>0.1.0</Version>
+    <Description>Microsoft.Extensions.DependencyInjection integration for Adsefid.Sdk.</Description>
+    <Authors>adsefid.com</Authors>
+    <PackageTags>adsefid;sms;messenger;webservice;sdk;dependency-injection</PackageTags>
+    <RepositoryUrl>https://github.com/adsefid/sdk-dotnet</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/adsefid/sdk-dotnet</PackageProjectUrl>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    <None Include="..\..\LICENSE" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Adsefid.Sdk\Adsefid.Sdk.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.1" />
+  </ItemGroup>
+
+</Project>
