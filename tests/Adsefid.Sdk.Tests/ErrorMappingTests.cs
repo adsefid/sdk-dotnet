@@ -34,18 +34,69 @@ public sealed class ErrorMappingTests
         Assert.Equal(rateLimited, exception is AdsefidRateLimitException);
     }
 
+    /// <summary>
+    /// The real shape of a validation failure: a field-to-message map under
+    /// <c>errors</c>, with plain string values.
+    /// </summary>
     [Fact]
-    public async Task DetailsSurviveIntact()
+    public async Task ValidationDetailsSurviveIntact()
     {
         var (client, _) = TestClient.RespondingWithFixture("errors/error.invalid_parameter.json", HttpStatusCode.BadRequest);
+
+        var exception = await Assert.ThrowsAsync<AdsefidApiException>(() => client.User.GetTemplatesAsync());
+
+        Assert.NotNull(exception.Details);
+        var errors = exception.Details.Value.GetProperty("errors");
+        Assert.Equal("invalid value for take", errors.GetProperty("take").GetString());
+        Assert.Equal("invalid value for state", errors.GetProperty("state").GetString());
+    }
+
+    /// <summary>
+    /// <c>Details</c> is left as a raw <see cref="JsonElement"/> because the service uses a
+    /// different shape per endpoint. Each real shape must come through uncoerced.
+    /// </summary>
+    [Fact]
+    public async Task SingleSendDetailsAreAFlatFieldToMessageMap()
+    {
+        var (client, _) = TestClient.RespondingWithFixture("errors/error.details_single.json", HttpStatusCode.BadRequest);
+
+        var exception = await Assert.ThrowsAsync<AdsefidApiException>(() => client.User.GetInfoAsync());
+
+        Assert.NotNull(exception.Details);
+        Assert.Equal("invalid value for receptor", exception.Details.Value.GetProperty("receptor").GetString());
+    }
+
+    [Fact]
+    public async Task BulkDetailsCarryPerItemErrorsKeyedByIndex()
+    {
+        var (client, _) = TestClient.RespondingWithFixture("errors/error.details_bulk.json", HttpStatusCode.BadRequest);
 
         var exception = await Assert.ThrowsAsync<AdsefidApiException>(() => client.User.GetInfoAsync());
 
         Assert.NotNull(exception.Details);
         var details = exception.Details.Value;
-        Assert.Equal(JsonValueKind.Object, details.ValueKind);
-        Assert.True(details.TryGetProperty("take", out _));
-        Assert.True(details.TryGetProperty("state", out _));
+        Assert.Equal("invalid value for line_number", details.GetProperty("errors").GetProperty("line_number").GetString());
+
+        var messages = details.GetProperty("messages").EnumerateArray().ToList();
+        Assert.Equal(2, messages.Count);
+        // The index says which item of your array failed, so a gap (0 then 2)
+        // is normal — it is not positional in this list.
+        Assert.Equal(2, messages[1].GetProperty("index").GetInt32());
+        Assert.Equal("invalid value for local_id", messages[1].GetProperty("errors").GetProperty("local_id").GetString());
+    }
+
+    [Fact]
+    public async Task CancelDetailsAreTheOneShapeWhoseValuesAreArrays()
+    {
+        var (client, _) = TestClient.RespondingWithFixture("errors/error.details_cancel.json", HttpStatusCode.BadRequest);
+
+        var exception = await Assert.ThrowsAsync<AdsefidApiException>(
+            () => client.Sms.CancelAsync(new Sms.Models.CancelSmsRequest { LocalIds = ["a"] }));
+
+        Assert.NotNull(exception.Details);
+        var localIds = exception.Details.Value.GetProperty("local_ids").EnumerateArray()
+            .Select(element => element.GetString()).ToList();
+        Assert.Equal(["order-10001", "order-10002"], localIds);
     }
 
     /// <summary>

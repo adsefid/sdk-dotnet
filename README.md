@@ -142,8 +142,19 @@ catch (AdsefidTransportException ex)
 }
 ```
 
-`AdsefidApiException.Details` is a loosely-typed `JsonElement?` because its shape is endpoint-specific
-(a validation map keyed by snake_case field path, a bulk item list, a cancel-specific map, or absent).
+`AdsefidApiException.Details` is a loosely-typed `JsonElement?` because its shape is endpoint-specific.
+
+`details` is not one shape — the service picks one per endpoint:
+
+| When | Shape | Example |
+|---|---|---|
+| Request validation (`2024 INVALID_PARAMETER`) | `{"errors": {field: message}}` — snake_case field paths, **string** values | `{"errors":{"take":"invalid value for take"}}` |
+| Single send | `{field: message}` — flat, no wrapper | `{"receptor":"invalid value for receptor"}` |
+| Bulk / P2P | `{"errors": {...}, "messages": [{"index": n, "errors": {...}}]}` — `index` is the position in *your* array, so gaps are normal | `{"errors":{},"messages":[{"index":2,"errors":{"local_id":"invalid value for local_id"}}]}` |
+| Cancel | `{field: [value, ...]}` — the one shape whose values are **arrays** | `{"local_ids":["order-10001"]}` |
+| Anything else | absent or `null` | |
+
+Decode it defensively for the endpoint you called rather than assuming a single shape.
 
 Bulk and P2P send endpoints have partial-success semantics: an HTTP 200 with `status: "success"` can
 still contain some failed items. These are **not** exceptions — they come back as a normal typed
