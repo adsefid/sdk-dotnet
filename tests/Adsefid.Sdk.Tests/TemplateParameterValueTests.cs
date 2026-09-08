@@ -120,4 +120,28 @@ public sealed class TemplateParameterValueTests
         Assert.Equal("001234", ((TemplateParameterValue)"001234").ToString());
         Assert.Equal("1.50", ((TemplateParameterValue)1.50m).ToString());
     }
+
+    /// <summary>
+    /// The shared cross-SDK example. All five SDKs serialize this parameter map to the same JSON,
+    /// which is what keeps a template rendered identically no matter which SDK sent it.
+    /// </summary>
+    [Fact]
+    public void TheSharedExampleSerializesAsTheOtherSdksDo()
+    {
+        var example = Infrastructure.Fixtures.Json("validation/template_parameters.json");
+
+        var parameters = new SortedDictionary<string, TemplateParameterValue>(StringComparer.Ordinal);
+        foreach (var property in example.GetProperty("parameters").EnumerateObject())
+        {
+            parameters[property.Name] = property.Value.ValueKind == JsonValueKind.String
+                ? property.Value.GetString()!
+                : property.Value.GetDecimal();
+        }
+
+        var json = JsonSerializer.Serialize(
+            parameters,
+            AdsefidJsonContext.Default.IReadOnlyDictionaryStringTemplateParameterValue);
+
+        Assert.Equal(example.GetProperty("expected_json").GetString(), json);
+    }
 }
