@@ -351,7 +351,7 @@ dotnet run --project examples/WebhookReceiver  # verify and dispatch inbound web
 This SDK follows Semantic Versioning independently of the API documentation.
 
 - SDK version: **`0.3.0`** (`<Version>` in `Adsefid.Sdk.csproj`)
-- Verified API documentation: **`v1.11.0`**
+- Verified API documentation: **`v1.12.0`**
 
 SDK releases use `v<SDK_VERSION>` tags. The two version numbers move independently.
 
