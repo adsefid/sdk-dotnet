@@ -33,7 +33,7 @@ public sealed class SmsResource
         Validation.RequireNonEmpty(request.Receptor, nameof(request.Receptor));
         Validation.RequireNonEmpty(request.LineNumber, nameof(request.LineNumber));
         Validation.RequireNonEmpty(request.Message, nameof(request.Message));
-        Validation.RequireMaxLength(request.Message, 900, nameof(request.Message));
+        Validation.RequireMaxLength(request.Message, Limits.SmsMessageMaxLength, nameof(request.Message));
         Validation.ValidateLocalId(request.LocalId, nameof(request.LocalId));
 
         return await _executor.PostJsonAsync(
@@ -56,7 +56,7 @@ public sealed class SmsResource
         ArgumentNullException.ThrowIfNull(request);
         Validation.RequireNonEmptyCollection(request.Receptors, nameof(request.Receptors));
         Validation.RequireNonEmpty(request.Message, nameof(request.Message));
-        Validation.RequireMaxLength(request.Message, 900, nameof(request.Message));
+        Validation.RequireMaxLength(request.Message, Limits.SmsMessageMaxLength, nameof(request.Message));
         Validation.RequireNonEmpty(request.LineNumber, nameof(request.LineNumber));
 
         foreach (var receptor in request.Receptors)
@@ -90,7 +90,7 @@ public sealed class SmsResource
         {
             Validation.RequireNonEmpty(message.Receptor, nameof(message.Receptor));
             Validation.RequireNonEmpty(message.Message, nameof(message.Message));
-            Validation.RequireMaxLength(message.Message, 900, nameof(message.Message));
+            Validation.RequireMaxLength(message.Message, Limits.SmsMessageMaxLength, nameof(message.Message));
             Validation.ValidateLocalId(message.LocalId, nameof(message.LocalId));
         }
 
@@ -141,7 +141,7 @@ public sealed class SmsResource
         Validation.RequireCombinedCountAtMost(
             messageIds?.Distinct().Count() ?? 0,
             localIds?.Distinct(StringComparer.Ordinal).Count() ?? 0,
-            2000,
+            Limits.CombinedStatusIdsMax,
             "The combined count of 'messageIds' and 'localIds' must not exceed 2000.");
 
         var query = CsvHelper.BuildIdsQuery(messageIds, localIds);
@@ -171,9 +171,9 @@ public sealed class SmsResource
 
     /// <summary>Fetches inbound SMS messages received on <paramref name="lineNumber"/>. <c>GET /v1/sms/receive</c>.</summary>
     /// <param name="lineNumber">The line to fetch inbound messages for.</param>
-    /// <param name="count">Maximum number of messages to return (0-499). Omit for the API's default page size.</param>
+    /// <param name="count">Maximum number of messages to return (1-499). Omit for the API's default page size.</param>
     /// <param name="since">Only return messages received at or after this time.</param>
-    /// <exception cref="AdsefidValidationException"><paramref name="lineNumber"/> is empty, or <paramref name="count"/> is outside 0-499.</exception>
+    /// <exception cref="AdsefidValidationException"><paramref name="lineNumber"/> is empty, or <paramref name="count"/> is outside 1-499.</exception>
     public async Task<GetReceivedSmsResponse> GetReceivedAsync(
         string lineNumber,
         int? count = null,
@@ -183,7 +183,7 @@ public sealed class SmsResource
         Validation.RequireNonEmpty(lineNumber, nameof(lineNumber));
         if (count is not null)
         {
-            Validation.RequireInRange(count.Value, 0, 499, nameof(count));
+            Validation.RequireInRange(count.Value, Limits.ReceiveCountMin, Limits.ReceiveCountMax, nameof(count));
         }
 
         var parts = new List<string> { $"line_number={Uri.EscapeDataString(lineNumber)}" };

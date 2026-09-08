@@ -1,2 +1,4 @@
 * text=auto eol=lf
 *.cs text eol=lf
+
+tests/**/fixtures/** -text

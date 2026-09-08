@@ -59,7 +59,7 @@ public sealed class UserResource
 
         if (take is not null)
         {
-            Validation.RequireInRange(take.Value, 1, 100, nameof(take));
+            Validation.RequireInRange(take.Value, Limits.TemplatesTakeMin, Limits.TemplatesTakeMax, nameof(take));
         }
 
         var parts = new List<string>();

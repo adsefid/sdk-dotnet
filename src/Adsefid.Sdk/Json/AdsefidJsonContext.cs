@@ -7,7 +7,10 @@ using Adsefid.Sdk.Webhooks;
 
 namespace Adsefid.Sdk.Json;
 
-[JsonSourceGenerationOptions(WriteIndented = false)]
+// WhenWritingNull keeps an omitted optional out of the request body entirely,
+// matching the sibling SDKs — otherwise every unset nullable would travel as an
+// explicit null. It affects writing only, so response parsing is unchanged.
+[JsonSourceGenerationOptions(WriteIndented = false, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(ErrorEnvelope))]
 [JsonSerializable(typeof(SendSingleSmsRequest))]
 [JsonSerializable(typeof(ResponseEnvelope<SendSingleSmsResponse>))]
