@@ -2,8 +2,9 @@
 
 ## Scope
 
-This repository is the .NET client SDK for the adsefid.com SMS Web Service API (package:
-`Adsefid.Sdk`), independently versioned and published with its own `Adsefid.Sdk.csproj`.
+This repository contains the .NET client SDK for the adsefid.com SMS Web Service API
+(`Adsefid.Sdk`) and its optional Microsoft dependency injection integration
+(`Adsefid.Sdk.DependencyInjection`). Each package has its own project and version.
 Equivalent SDKs exist for the same API in sibling repositories (`sdk-js`, `sdk-php`, `sdk-python`,
 `sdk-go`); a behavior change here should generally be considered for parity there.
 
@@ -16,8 +17,8 @@ behavior) is defined by the published adsefid.com SMS Web Service API documentat
 documentation before changing any endpoint, request/response model, or enum. If the doc has moved on
 since `v1.12.0`, diff it against what's implemented here before trusting either side.
 
-The SDK follows independent Semantic Versioning from `<Version>` in `Adsefid.Sdk.csproj`; never
-copy the API-document version into package metadata. Record both versions in the README.
+Each package follows independent Semantic Versioning from its project `<Version>`; never copy the
+API-document version into package metadata. Record package and API-document versions in the README.
 
 A small number of facts below are empirically observed behaviors of the live API that are easy to
 get wrong from a literal reading of the documentation's prose or pseudo-code. Trust these notes over
@@ -41,6 +42,7 @@ an ambiguous doc reading:
 | Folder | Responsibility |
 |---|---|
 | `Http/` | Transport (`RequestExecutor`), envelope parsing, error-to-exception mapping, multipart upload, CSV/query helpers, client-side validation helpers |
+| `src/Adsefid.Sdk.DependencyInjection/` | Optional `IServiceCollection.AddAdsefid` typed-client registration |
 | `Json/` | The single source-generated `AdsefidJsonContext` (`JsonSerializerContext`) plus the handful of custom `JsonConverter<T>` types it references (`TemplateState`, `TemplateParameterType`, `TemplateParameterValue`) |
 | `Exceptions/` | The typed exception hierarchy every failure surfaces through |
 | `Enums/` | `LineSelector`, `WebServiceMessageStatus`, `WebServiceResponseCode`, `TemplateState`, `TemplateParameterType` |
@@ -87,6 +89,10 @@ an ambiguous doc reading:
 - **Request bodies omit nulls.** `AdsefidJsonContext` sets
   `DefaultIgnoreCondition = WhenWritingNull`, so an unset optional is absent from the body rather
   than an explicit `null`, matching the sibling SDKs.
+- **Keep dependency injection optional.** Core `Adsefid.Sdk` stays BCL-only. The companion package
+  alone references `Microsoft.Extensions.Http`, registers the concrete client as transient, and
+  returns `IHttpClientBuilder` for caller-owned transport configuration. Do not add a one-member
+  client interface.
 
 - No reflection-based JSON, ever. Every serializable type must be registered on
   `AdsefidJsonContext`; if `dotnet build` doesn't fail but a type silently falls back to reflection,
@@ -108,7 +114,8 @@ an ambiguous doc reading:
 
 ```bash
 dotnet build
-dotnet pack -c Release
+dotnet pack src/Adsefid.Sdk/Adsefid.Sdk.csproj -c Release
+dotnet pack src/Adsefid.Sdk.DependencyInjection/Adsefid.Sdk.DependencyInjection.csproj -c Release
 ```
 
 MSBuild settings live in this repository's own `Directory.Build.props`.

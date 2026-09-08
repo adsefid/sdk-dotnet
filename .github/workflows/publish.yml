@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing release tag to publish (for example, v0.1.0)
+        description: Existing release tag (v0.3.0 or dependency-injection-v0.1.0)
         required: true
         type: string
 
@@ -24,10 +24,29 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      package_id: ${{ steps.release.outputs.package_id }}
     steps:
-      - name: Validate release tag
+      - name: Resolve release target
+        id: release
         shell: bash
-        run: '[[ "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]'
+        run: |
+          version_pattern='(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?'
+          if [[ "$RELEASE_TAG" =~ ^v${version_pattern}$ ]]; then
+            project='src/Adsefid.Sdk/Adsefid.Sdk.csproj'
+            package_id='Adsefid.Sdk'
+            version="${RELEASE_TAG#v}"
+          elif [[ "$RELEASE_TAG" =~ ^dependency-injection-v${version_pattern}$ ]]; then
+            project='src/Adsefid.Sdk.DependencyInjection/Adsefid.Sdk.DependencyInjection.csproj'
+            package_id='Adsefid.Sdk.DependencyInjection'
+            version="${RELEASE_TAG#dependency-injection-v}"
+          else
+            echo "Unsupported release tag: $RELEASE_TAG" >&2
+            exit 1
+          fi
+          echo "project=$project" >> "$GITHUB_OUTPUT"
+          echo "package_id=$package_id" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -40,12 +59,15 @@ jobs:
 
       - name: Verify release version
         shell: bash
+        env:
+          PACKAGE_PROJECT: ${{ steps.release.outputs.project }}
+          PACKAGE_VERSION: ${{ steps.release.outputs.version }}
         run: |
-          package_version="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' src/Adsefid.Sdk/Adsefid.Sdk.csproj)"
-          test "${RELEASE_TAG#v}" = "$package_version"
+          project_version="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' "$PACKAGE_PROJECT")"
+          test "$PACKAGE_VERSION" = "$project_version"
 
-      - run: dotnet restore src/Adsefid.Sdk/Adsefid.Sdk.csproj
-      - run: dotnet pack src/Adsefid.Sdk/Adsefid.Sdk.csproj --configuration Release --no-restore --output artifacts -p:ContinuousIntegrationBuild=true
+      - run: dotnet restore "${{ steps.release.outputs.project }}"
+      - run: dotnet pack "${{ steps.release.outputs.project }}" --configuration Release --no-restore --output artifacts -p:ContinuousIntegrationBuild=true
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -60,7 +82,7 @@ jobs:
     timeout-minutes: 10
     environment:
       name: nuget
-      url: https://www.nuget.org/packages/Adsefid.Sdk
+      url: https://www.nuget.org/packages/${{ needs.build.outputs.package_id }}
     permissions:
       id-token: write
     steps:

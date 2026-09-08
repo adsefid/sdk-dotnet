@@ -7,8 +7,9 @@ A .NET client SDK for the [adsefid.com SMS Web Service](https://adsefid.com) RES
 endpoints, plus outgoing webhook signature verification.
 
 - Single target framework: `net8.0`
-- Zero external dependencies (BCL only), zero reflection — JSON is handled by a source-generated
-  `System.Text.Json` serializer context
+- Core package has zero external dependencies (BCL only) and zero reflection — JSON is handled by
+  a source-generated `System.Text.Json` serializer context
+- Optional `Adsefid.Sdk.DependencyInjection` package integrates with `IHttpClientFactory`
 - Throws typed exceptions on error; never returns a `Result`/`Either` wrapper
 
 ## Requirements
@@ -81,6 +82,46 @@ To control timeouts, configure them on the `HttpClient` you supply (`HttpClient.
 `IHttpClientFactory` handler configuration) — the SDK does not impose its own timeout.
 
 Monetary response properties (`Cost`, `TotalCost`, and `CreditLeft`) use `decimal` and may contain fractional values.
+
+## Dependency injection
+
+Install the optional companion package. It includes the core SDK transitively:
+
+```bash
+dotnet add package Adsefid.Sdk.DependencyInjection
+```
+
+Register `AdsefidClient` as a typed HTTP client:
+
+```csharp
+using Adsefid.Sdk;
+using Adsefid.Sdk.Sms.Models;
+using Microsoft.Extensions.DependencyInjection;
+
+builder.Services
+    .AddAdsefid(_ => new AdsefidClientOptions
+    {
+        ApiKey = builder.Configuration["Adsefid:ApiKey"]
+            ?? throw new InvalidOperationException("Adsefid:ApiKey is not set."),
+    })
+    .ConfigureHttpClient(httpClient => httpClient.Timeout = TimeSpan.FromSeconds(30));
+```
+
+Inject the concrete client into transient or scoped services:
+
+```csharp
+public sealed class MessageSender(AdsefidClient client)
+{
+    public Task<SendSingleSmsResponse> SendAsync(
+        SendSingleSmsRequest request,
+        CancellationToken cancellationToken = default) =>
+        client.Sms.SendSingleAsync(request, cancellationToken);
+}
+```
+
+`AddAdsefid` returns `IHttpClientBuilder`, so configure handlers, proxies, logging, and timeouts on
+that builder. Do not set `AdsefidClientOptions.HttpClient` in the options factory. Typed clients are
+transient; do not capture one in a singleton service.
 
 ## Resource reference
 
@@ -350,10 +391,13 @@ dotnet run --project examples/WebhookReceiver  # verify and dispatch inbound web
 
 This SDK follows Semantic Versioning independently of the API documentation.
 
-- SDK version: **`0.3.0`** (`<Version>` in `Adsefid.Sdk.csproj`)
+- Core SDK version: **`0.3.0`** (`Adsefid.Sdk`)
+- Dependency injection package version: **`0.1.0`** (`Adsefid.Sdk.DependencyInjection`)
 - Verified API documentation: **`v1.12.0`**
 
-SDK releases use `v<SDK_VERSION>` tags. The two version numbers move independently.
+Core releases use `v<SDK_VERSION>` tags. Dependency injection releases use
+`dependency-injection-v<PACKAGE_VERSION>` tags. Package versions and API documentation versions
+move independently.
 
 ## License
 
