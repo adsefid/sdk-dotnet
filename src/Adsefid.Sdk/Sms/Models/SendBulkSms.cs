@@ -76,7 +76,7 @@ public sealed class SendBulkSmsResponse
 
     /// <summary>Total cost charged across all receptors in this send.</summary>
     [JsonPropertyName("total_cost")]
-    public required long TotalCost { get; init; }
+    public required decimal TotalCost { get; init; }
 }
 
 /// <summary>The outcome for a single receptor in a bulk SMS send.</summary>
@@ -100,5 +100,5 @@ public sealed class BulkSmsReceptorResult
     public required bool Hide { get; init; }
 
     [JsonPropertyName("cost")]
-    public required long Cost { get; init; }
+    public required decimal Cost { get; init; }
 }

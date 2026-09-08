@@ -13,7 +13,7 @@ public sealed class UserInfo
 
     /// <summary>Remaining account credit/balance.</summary>
     [JsonPropertyName("credit_left")]
-    public required long CreditLeft { get; init; }
+    public required decimal CreditLeft { get; init; }
 
     [JsonPropertyName("email")]
     public string? Email { get; init; }

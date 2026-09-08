@@ -55,7 +55,7 @@ public sealed class SendTemplateMessengerResponse
     public DateTimeOffset? ExpiryDate { get; init; }
 
     [JsonPropertyName("cost")]
-    public required long Cost { get; init; }
+    public required decimal Cost { get; init; }
 
     [JsonPropertyName("receptor")]
     public required string Receptor { get; init; }

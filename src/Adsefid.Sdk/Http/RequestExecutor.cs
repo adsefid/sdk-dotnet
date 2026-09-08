@@ -8,7 +8,7 @@ using Adsefid.Sdk.Models.Common;
 
 namespace Adsefid.Sdk.Http;
 
-internal sealed class RequestExecutor(HttpClient httpClient, Uri baseUri, string apiKey)
+internal sealed class RequestExecutor(HttpClient httpClient, Uri baseUri, string apiKey, string userAgent)
 {
     private const WebServiceResponseCode UnknownResponseCode = (WebServiceResponseCode)(-1);
 
@@ -47,6 +47,7 @@ internal sealed class RequestExecutor(HttpClient httpClient, Uri baseUri, string
     {
         using var request = new HttpRequestMessage(method, new Uri(baseUri, requestUri));
         request.Headers.Add("X-API-KEY", apiKey);
+        request.Headers.TryAddWithoutValidation("User-Agent", userAgent);
         request.Headers.Accept.ParseAdd("application/json");
         if (contentFactory is not null)
         {
