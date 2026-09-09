@@ -1,9 +1,9 @@
 ﻿// Bulk and P2P SMS sends, and how to read a partial success.
 //
 // Both endpoints answer HTTP 200 even when some receptors failed, so a call
-// that did not throw still needs its per-item results inspected. Each item's
-// Status is a plain int: below 2000 it is a delivery status, 2000 and above it
-// is an error code explaining why that one receptor was rejected.
+// that did not throw still needs its per-item results inspected. Each item.s
+// Status is the raw WebServiceCode; MessageStatus and ErrorCode split it into
+// the typed enum for its range, so a caller never compares ints.
 using Adsefid.Sdk;
 using Adsefid.Sdk.Enums;
 using Adsefid.Sdk.Sms.Models;
@@ -35,7 +35,7 @@ var bulk = await client.Sms.SendBulkAsync(new SendBulkSmsRequest
 Console.WriteLine($"\nbulk group {bulk.GroupId}: {bulk.TotalCount} receptors, cost {bulk.TotalCost}");
 foreach (var receptor in bulk.Receptors)
 {
-    Report(receptor.Receptor, receptor.LocalId, receptor.Status, receptor.MessageId?.ToString());
+    Report(receptor.Receptor, receptor.LocalId, receptor.Status, receptor.MessageStatus, receptor.ErrorCode, receptor.MessageId?.ToString());
 }
 
 Console.WriteLine($"  status histogram: {string.Join(", ", bulk.Counts.Select(entry => $"{entry.Key}={entry.Value}"))}");
@@ -54,22 +54,22 @@ var p2p = await client.Sms.SendP2PAsync(new SendP2PSmsRequest
 Console.WriteLine($"\np2p group {p2p.GroupId}: cost {p2p.TotalCost}");
 foreach (var message in p2p.Messages)
 {
-    Report(message.Receptor, message.LocalId, message.Status, message.MessageId?.ToString());
+    Report(message.Receptor, message.LocalId, message.Status, message.MessageStatus, message.ErrorCode, message.MessageId?.ToString());
 }
 
 return 0;
 
-// A status below 2000 is a WebServiceMessageStatus; 2000 and above is a
-// WebServiceResponseCode for that single receptor.
-static void Report(string receptor, string? localId, int status, string? messageId)
+// ErrorCode is set for a rejected item, MessageStatus for an accepted one; both are null
+// for a code this SDK does not know yet, which is why the raw Status is still printed.
+static void Report(string receptor, string? localId, int status, WebServiceMessageStatus? messageStatus, WebServiceResponseCode? errorCode, string? messageId)
 {
     var label = localId ?? "-";
 
-    if (status >= 2000)
+    if (errorCode is not null || WebServiceCode.IsErrorCode(status))
     {
-        Console.WriteLine($"  {receptor,-14} ({label}) FAILED with code {status} ({(WebServiceResponseCode)status})");
+        Console.WriteLine($"  {receptor,-14} ({label}) FAILED with code {status} ({errorCode?.ToString() ?? "unknown"})");
         return;
     }
 
-    Console.WriteLine($"  {receptor,-14} ({label}) accepted as {messageId ?? "-"}: {(WebServiceMessageStatus)status}");
+    Console.WriteLine($"  {receptor,-14} ({label}) accepted as {messageId ?? "-"}: {messageStatus?.ToString() ?? status.ToString()}");
 }

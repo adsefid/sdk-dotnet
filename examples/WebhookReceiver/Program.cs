@@ -9,8 +9,10 @@ var webhookSecret = Environment.GetEnvironmentVariable("ADSEFID_WEBHOOK_SECRET")
 
 app.MapPost("/webhooks/adsefid", async (HttpRequest request) =>
 {
-    using var reader = new StreamReader(request.Body);
-    var rawBody = await reader.ReadToEndAsync();
+    // Verify the exact bytes the service signed; do not let a JSON body reader touch them first.
+    using var buffer = new MemoryStream();
+    await request.Body.CopyToAsync(buffer);
+    var rawBody = buffer.ToArray();
 
     var signature = request.Headers[WebhookHeaderNames.Signature].ToString();
     var timestamp = request.Headers[WebhookHeaderNames.Timestamp].ToString();

@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using System.Text.Json;
+using Adsefid.Sdk.Enums;
 using Adsefid.Sdk.Exceptions;
 using Adsefid.Sdk.Messenger.Models;
 using Adsefid.Sdk.Models.Common;
@@ -47,6 +48,8 @@ public sealed class MessengerResourceTests
 
         Assert.Equal([1000, 2025], result.Receptors.Select(receptor => receptor.Status));
         Assert.Null(result.Receptors[1].MessageId);
+        Assert.Equal(WebServiceMessageStatus.Scheduled, result.Receptors[0].MessageStatus);
+        Assert.Equal(WebServiceResponseCode.ReceptorBlacklisted, result.Receptors[1].ErrorCode);
     }
 
     [Fact]

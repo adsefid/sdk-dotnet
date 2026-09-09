@@ -45,7 +45,7 @@ an ambiguous doc reading:
 | `src/Adsefid.Sdk.DependencyInjection/` | Optional `IServiceCollection.AddAdsefid` typed-client registration |
 | `Json/` | The single source-generated `AdsefidJsonContext` (`JsonSerializerContext`) plus the handful of custom `JsonConverter<T>` types it references (`TemplateState`, `TemplateParameterType`, `TemplateParameterValue`) |
 | `Exceptions/` | The typed exception hierarchy every failure surfaces through |
-| `Enums/` | `LineSelector`, `WebServiceMessageStatus`, `WebServiceResponseCode`, `TemplateState`, `TemplateParameterType` |
+| `Enums/` | `LineSelector`, `WebServiceMessageStatus`, `WebServiceResponseCode`, `TemplateState`, `TemplateParameterType`, plus the `WebServiceCode` range helpers behind the per-item `MessageStatus`/`ErrorCode` views on bulk/P2P results |
 | `Models/Common/` | Shapes shared across resources: `ResponseEnvelope<T>`, `ApiErrorPayload`/`ErrorEnvelope`, `TemplateParameterValue` |
 | `Sms/`, `Messenger/`, `User/` | One resource client per API area (`SmsResource`, `MessengerResource`, `UserResource`) plus their `Models/` request/response types |
 | `Webhooks/` | `WebhookVerifier` (signature + timestamp verification, payload dispatch), the `WebhookEvent` record hierarchy, and `WebhookHeaderNames`/`WebhookEventTypes` constants (use these instead of typing header/type strings) |
@@ -84,7 +84,8 @@ an ambiguous doc reading:
 - **The webhook secret is Base64.** A webhook endpoint's secret is 32 random bytes shown
   Base64-encoded in the panel, and the service signs with the **decoded** bytes.
   `WebhookVerifier.VerifyAndParse` decodes before keying the HMAC, and has a `ReadOnlySpan<byte>`
-  overload for a pre-decoded key. Keying the HMAC with the UTF-8 bytes of the Base64 string does not
+  overload for a pre-decoded key. The primary overloads take the raw body as `ReadOnlySpan<byte>`;
+  the `string` overloads re-encode as UTF-8 and exist for convenience only. Keying the HMAC with the UTF-8 bytes of the Base64 string does not
   verify against the live service.
 - **Request bodies omit nulls.** `AdsefidJsonContext` sets
   `DefaultIgnoreCondition = WhenWritingNull`, so an unset optional is absent from the body rather

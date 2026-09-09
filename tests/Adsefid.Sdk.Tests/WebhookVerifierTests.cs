@@ -61,6 +61,31 @@ public sealed class WebhookVerifierTests
             () => WebhookVerifier.VerifyAndParse(BodyText(), wrong, vector.Timestamp, vector.Secret, ACentury));
     }
 
+    /// <summary>
+    /// The byte overload is the primary one: it signs the exact bytes off the wire, with no
+    /// string round trip in between.
+    /// </summary>
+    [Fact]
+    public void TheRawBodyBytesOverloadVerifiesTheGoldenVector()
+    {
+        var vector = Vector();
+
+        var result = WebhookVerifier.VerifyAndParse(vector.Body, vector.Signature, vector.Timestamp, vector.Secret, ACentury);
+
+        Assert.IsType<ReceiveWebhookEvent>(result);
+    }
+
+    [Fact]
+    public void TheRawBodyBytesAndDecodedKeyOverloadVerifiesTheGoldenVector()
+    {
+        var vector = Vector();
+        ReadOnlySpan<byte> key = Convert.FromBase64String(vector.Secret);
+
+        var result = WebhookVerifier.VerifyAndParse(vector.Body, vector.Signature, vector.Timestamp, key, ACentury);
+
+        Assert.IsType<ReceiveWebhookEvent>(result);
+    }
+
     [Fact]
     public void TheDecodedKeyOverloadAcceptsRawBytes()
     {
