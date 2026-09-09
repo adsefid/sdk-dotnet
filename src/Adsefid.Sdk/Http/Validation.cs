@@ -72,6 +72,14 @@ internal static partial class Validation
         }
     }
 
+    public static void RequireNonNegative(int value, string fieldName)
+    {
+        if (value < 0)
+        {
+            throw new AdsefidValidationException($"'{fieldName}' must be non-negative.");
+        }
+    }
+
     public static void RequireAtLeastOne(bool firstProvided, bool secondProvided, string message)
     {
         if (!firstProvided && !secondProvided)

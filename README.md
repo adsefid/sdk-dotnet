@@ -71,9 +71,9 @@ var client = new AdsefidClient(new AdsefidClientOptions
     UserAgent = "my-service/1.0.0",
 
     // Supply your own HttpClient, e.g. one created via IHttpClientFactory.
-    // When omitted, the SDK lazily creates and caches a default HttpClient
-    // per (BaseUrl, ApiKey) pair, with BaseAddress and the X-API-KEY header
-    // already configured.
+    // When omitted, every AdsefidClient shares one static HttpClient. The SDK
+    // always sends the absolute request URI and the X-API-KEY header itself,
+    // so the client you supply needs no BaseAddress or default headers.
     HttpClient = httpClientFactory.CreateClient("adsefid"),
 });
 ```
@@ -201,6 +201,21 @@ Bulk and P2P send endpoints have partial-success semantics: an HTTP 200 with `st
 still contain some failed items. These are **not** exceptions — they come back as a normal typed
 response (e.g. `SendBulkSmsResponse.Receptors`) where each item carries its own status/code.
 
+Each item.s `Status` is the raw `WebServiceCode` from the service: `1000-1999` means the item was
+accepted and `MessageStatus` gives it as a `WebServiceMessageStatus?`; `2000` and above means that one
+item was rejected and `ErrorCode` gives it as a `WebServiceResponseCode?`. Both views are `null` for
+a code this SDK does not know yet, and `WebServiceCode.AsMessageStatus`/`AsErrorCode` do the same
+split for any raw value:
+
+```csharp
+foreach (var item in result.Receptors)
+{
+    Console.WriteLine(item.ErrorCode is { } error
+        ? $"{item.Receptor}: rejected ({error})"
+        : $"{item.Receptor}: {item.MessageStatus?.ToString() ?? item.Status.ToString()}");
+}
+```
+
 ## Rate limits
 
 Codes `2035` (`MessageLimitReached`) and `2036` (`RequestLimitReached`) — and a bare HTTP `429` with an
@@ -279,8 +294,10 @@ var app = WebApplication.Create();
 
 app.MapPost("/webhooks/adsefid", async (HttpRequest request) =>
 {
-    using var reader = new StreamReader(request.Body);
-    var rawBody = await reader.ReadToEndAsync();
+    // Verify the exact bytes the service signed; do not let a JSON body reader touch them first.
+    using var buffer = new MemoryStream();
+    await request.Body.CopyToAsync(buffer);
+    var rawBody = buffer.ToArray();
 
     var signature = request.Headers[WebhookHeaderNames.Signature].ToString();
     var timestamp = request.Headers[WebhookHeaderNames.Timestamp].ToString();

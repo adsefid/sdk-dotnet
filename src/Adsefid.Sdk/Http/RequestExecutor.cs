@@ -80,27 +80,33 @@ internal sealed class RequestExecutor(HttpClient httpClient, Uri baseUri, string
                 throw new AdsefidTransportException("Failed to read the adsefid.com API response body.", ex);
             }
 
+            var httpStatusCode = (int)response.StatusCode;
+            if (response.IsSuccessStatusCode)
+            {
+                return ParseSuccess(responseBody, responseTypeInfo, httpStatusCode);
+            }
+
             var errorPayload = TryReadError(responseBody);
             if (errorPayload is not null)
             {
-                throw CreateApiException((int)response.StatusCode, errorPayload);
+                throw CreateApiException(httpStatusCode, errorPayload);
             }
 
-            if (response.IsSuccessStatusCode)
+            if (httpStatusCode == 429)
             {
-                return ParseSuccess(responseBody, responseTypeInfo);
+                throw new AdsefidRateLimitException(WebServiceResponseCode.RequestLimitReached, "RATE_LIMITED", httpStatusCode, null);
             }
 
-            if ((int)response.StatusCode == 429)
-            {
-                throw new AdsefidRateLimitException(WebServiceResponseCode.RequestLimitReached, "RATE_LIMITED", (int)response.StatusCode, null);
-            }
-
-            throw new AdsefidApiException(UnknownResponseCode, "UNKNOWN_ERROR", (int)response.StatusCode, null);
+            throw new AdsefidApiException(UnknownResponseCode, "UNKNOWN_ERROR", httpStatusCode, null);
         }
     }
 
-    private static TData ParseSuccess<TData>(string responseBody, JsonTypeInfo<ResponseEnvelope<TData>> responseTypeInfo)
+    // A 2xx body is parsed once, as the typed success envelope. Only when that does not yield a
+    // success payload is the body re-read as an error envelope, so the happy path never parses twice.
+    private static TData ParseSuccess<TData>(
+        string responseBody,
+        JsonTypeInfo<ResponseEnvelope<TData>> responseTypeInfo,
+        int httpStatusCode)
     {
         ResponseEnvelope<TData>? envelope;
         try
@@ -109,11 +115,21 @@ internal sealed class RequestExecutor(HttpClient httpClient, Uri baseUri, string
         }
         catch (JsonException ex)
         {
+            if (TryReadError(responseBody) is { } errorPayload)
+            {
+                throw CreateApiException(httpStatusCode, errorPayload);
+            }
+
             throw new AdsefidTransportException("Failed to deserialize a successful adsefid.com API response.", ex);
         }
 
         if (envelope is null || envelope.Status != "success" || envelope.Data is null)
         {
+            if (TryReadError(responseBody) is { } errorPayload)
+            {
+                throw CreateApiException(httpStatusCode, errorPayload);
+            }
+
             throw new AdsefidTransportException("The adsefid.com API returned an unexpected response shape.");
         }
 

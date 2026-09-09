@@ -45,6 +45,7 @@ public sealed class UserResource
     /// <param name="state">Only return templates in this <see cref="TemplateState"/>. Omit to return templates in any state.</param>
     /// <param name="skip">Number of items to skip, for paging.</param>
     /// <param name="take">Maximum number of items to return (1-100). Omit for the API's default page size.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
     /// <exception cref="AdsefidValidationException"><paramref name="skip"/> is negative, or <paramref name="take"/> is outside 1-100.</exception>
     public async Task<GetUserTemplatesResponse> GetTemplatesAsync(
         TemplateState? state = null,
@@ -54,7 +55,7 @@ public sealed class UserResource
     {
         if (skip is not null)
         {
-            Validation.RequireInRange(skip.Value, 0, int.MaxValue, nameof(skip));
+            Validation.RequireNonNegative(skip.Value, nameof(skip));
         }
 
         if (take is not null)

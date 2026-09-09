@@ -102,6 +102,12 @@ public sealed class SmsResourceTests
         Assert.Equal(2025, result.Receptors[1].Status);
         Assert.Null(result.Receptors[1].MessageId);
         Assert.Equal(2, result.TotalCount);
+
+        // The typed views split the WebServiceCode by range, so a caller never compares raw ints.
+        Assert.Equal(WebServiceMessageStatus.Scheduled, result.Receptors[0].MessageStatus);
+        Assert.Null(result.Receptors[0].ErrorCode);
+        Assert.Null(result.Receptors[1].MessageStatus);
+        Assert.Equal(WebServiceResponseCode.ReceptorBlacklisted, result.Receptors[1].ErrorCode);
     }
 
     [Fact]
@@ -116,6 +122,8 @@ public sealed class SmsResourceTests
         });
 
         Assert.Equal([1000, 2014], result.Messages.Select(message => message.Status));
+        Assert.Equal([WebServiceMessageStatus.Scheduled, null], result.Messages.Select(message => message.MessageStatus));
+        Assert.Equal([null, WebServiceResponseCode.InvalidReceptor], result.Messages.Select(message => message.ErrorCode));
     }
 
     /// <summary>

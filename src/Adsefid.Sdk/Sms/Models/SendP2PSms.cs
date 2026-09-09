@@ -19,6 +19,7 @@ public sealed class SendP2PSmsRequest
     public LineSelector? LineSelector { get; init; }
 }
 
+/// <summary>One receptor-and-message entry of a P2P SMS send.</summary>
 public sealed class P2PSmsMessage
 {
     [JsonPropertyName("receptor")]
@@ -78,9 +79,22 @@ public sealed class P2PSmsMessageResult
     [JsonPropertyName("receptor")]
     public required string Receptor { get; init; }
 
-    /// <summary>Numeric per-item status code (see <see cref="WebServiceMessageStatus"/> for known values).</summary>
+    /// <summary>
+    /// The raw per-item <c>WebServiceCode</c>: 1000-1999 means this item was accepted (see
+    /// <see cref="MessageStatus"/>), 2000 or above means this one item was rejected (see
+    /// <see cref="ErrorCode"/>). Kept as an <see cref="int"/> so a code this SDK does not know yet
+    /// still round-trips.
+    /// </summary>
     [JsonPropertyName("status")]
     public required int Status { get; init; }
+
+    /// <summary>The named message status when <see cref="Status"/> is in 1000-1999, otherwise <see langword="null"/>.</summary>
+    [JsonIgnore]
+    public WebServiceMessageStatus? MessageStatus => WebServiceCode.AsMessageStatus(Status);
+
+    /// <summary>The named error code when <see cref="Status"/> is 2000 or above, otherwise <see langword="null"/>.</summary>
+    [JsonIgnore]
+    public WebServiceResponseCode? ErrorCode => WebServiceCode.AsErrorCode(Status);
 
     [JsonPropertyName("local_id")]
     public string? LocalId { get; init; }

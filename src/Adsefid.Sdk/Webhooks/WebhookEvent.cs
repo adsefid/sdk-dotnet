@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 namespace Adsefid.Sdk.Webhooks;
 
 /// <summary>
-/// Base type for a verified, parsed webhook delivery. <see cref="WebhookVerifier.VerifyAndParse"/>
+/// Base type for a verified, parsed webhook delivery. <see cref="WebhookVerifier.VerifyAndParse(ReadOnlySpan{byte}, string, string, string, TimeSpan?)"/>
 /// returns one of its concrete subtypes: <see cref="ReceiveWebhookEvent"/>,
 /// <see cref="StatusWebhookEvent"/>, or <see cref="MessengerStatusWebhookEvent"/> — pattern-match on
 /// the returned instance rather than switching on <see cref="Type"/> directly.

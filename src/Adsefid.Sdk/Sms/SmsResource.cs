@@ -1,4 +1,5 @@
-﻿using Adsefid.Sdk.Http;
+﻿using Adsefid.Sdk.Exceptions;
+using Adsefid.Sdk.Http;
 using Adsefid.Sdk.Json;
 using Adsefid.Sdk.Sms.Models;
 
@@ -173,6 +174,7 @@ public sealed class SmsResource
     /// <param name="lineNumber">The line to fetch inbound messages for.</param>
     /// <param name="count">Maximum number of messages to return (1-499). Omit for the API's default page size.</param>
     /// <param name="since">Only return messages received at or after this time.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
     /// <exception cref="AdsefidValidationException"><paramref name="lineNumber"/> is empty, or <paramref name="count"/> is outside 1-499.</exception>
     public async Task<GetReceivedSmsResponse> GetReceivedAsync(
         string lineNumber,

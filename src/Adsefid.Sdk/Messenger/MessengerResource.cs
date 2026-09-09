@@ -1,4 +1,5 @@
-﻿using Adsefid.Sdk.Http;
+﻿using Adsefid.Sdk.Exceptions;
+using Adsefid.Sdk.Http;
 using Adsefid.Sdk.Json;
 using Adsefid.Sdk.Messenger.Models;
 
@@ -107,6 +108,7 @@ public sealed class MessengerResource
     /// <param name="fileStream">The file content. The stream is read but not disposed by this method — the caller owns its lifetime.</param>
     /// <param name="fileName">The file name to report to the API.</param>
     /// <param name="contentType">The MIME type of the file (e.g. <c>"application/pdf"</c>).</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
     /// <exception cref="AdsefidValidationException"><paramref name="fileName"/> or <paramref name="contentType"/> is empty.</exception>
     public async Task<UploadMessengerFileResponse> UploadFileAsync(
         Stream fileStream,
@@ -182,7 +184,7 @@ public sealed class MessengerResource
         Validation.RequireCombinedCountAtMost(
             messageIds?.Distinct().Count() ?? 0,
             localIds?.Distinct(StringComparer.Ordinal).Count() ?? 0,
-            2000,
+            Limits.CombinedStatusIdsMax,
             "The combined count of 'messageIds' and 'localIds' must not exceed 2000.");
 
         var query = CsvHelper.BuildIdsQuery(messageIds, localIds);
