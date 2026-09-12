@@ -1,5 +1,4 @@
 ﻿using System.Net;
-using System.Text.Json;
 using Adsefid.Sdk.Enums;
 using Adsefid.Sdk.Exceptions;
 using Adsefid.Sdk.Tests.Infrastructure;
@@ -34,59 +33,47 @@ public sealed class ErrorMappingTests
         Assert.Equal(rateLimited, exception is AdsefidRateLimitException);
     }
 
-    /// <summary>
-    /// The real shape of a validation failure: a field-to-message map under
-    /// <c>errors</c>, with plain string values.
-    /// </summary>
     [Fact]
-    public async Task ValidationDetailsSurviveIntact()
+    public async Task ValidationDetailsAreTyped()
     {
         var (client, _) = TestClient.RespondingWithFixture("errors/error.invalid_parameter.json", HttpStatusCode.BadRequest);
 
         var exception = await Assert.ThrowsAsync<AdsefidApiException>(() => client.User.GetTemplatesAsync());
 
         Assert.NotNull(exception.Details);
-        var errors = exception.Details.Value.GetProperty("errors");
-        Assert.Equal("invalid value for take", errors.GetProperty("take").GetString());
-        Assert.Equal("invalid value for state", errors.GetProperty("state").GetString());
+        Assert.Equal(WebServiceResponseCode.InvalidParameter, exception.Details.Errors!["take"].Code);
+        Assert.Equal("INVALID_PARAMETER", exception.Details.Errors["state"].Name);
     }
 
-    /// <summary>
-    /// <c>Details</c> is left as a raw <see cref="JsonElement"/> because the service uses a
-    /// different shape per endpoint. Each real shape must come through uncoerced.
-    /// </summary>
     [Fact]
-    public async Task SingleSendDetailsAreAFlatFieldToMessageMap()
+    public async Task SingleSendDetailsUseTheSharedFieldErrorShape()
     {
         var (client, _) = TestClient.RespondingWithFixture("errors/error.details_single.json", HttpStatusCode.BadRequest);
 
         var exception = await Assert.ThrowsAsync<AdsefidApiException>(() => client.User.GetInfoAsync());
 
         Assert.NotNull(exception.Details);
-        Assert.Equal("invalid value for receptor", exception.Details.Value.GetProperty("receptor").GetString());
+        var receptor = exception.Details.Errors!["receptor"];
+        Assert.Equal(WebServiceResponseCode.InvalidReceptor, receptor.Code);
+        Assert.Equal("INVALID_RECEPTOR", receptor.Name);
     }
 
     [Fact]
-    public async Task BulkDetailsCarryPerItemErrorsKeyedByIndex()
+    public async Task BulkDetailsCarryTypedPerItemErrors()
     {
         var (client, _) = TestClient.RespondingWithFixture("errors/error.details_bulk.json", HttpStatusCode.BadRequest);
 
         var exception = await Assert.ThrowsAsync<AdsefidApiException>(() => client.User.GetInfoAsync());
 
         Assert.NotNull(exception.Details);
-        var details = exception.Details.Value;
-        Assert.Equal("invalid value for line_number", details.GetProperty("errors").GetProperty("line_number").GetString());
-
-        var messages = details.GetProperty("messages").EnumerateArray().ToList();
-        Assert.Equal(2, messages.Count);
-        // The index says which item of your array failed, so a gap (0 then 2)
-        // is normal — it is not positional in this list.
-        Assert.Equal(2, messages[1].GetProperty("index").GetInt32());
-        Assert.Equal("invalid value for local_id", messages[1].GetProperty("errors").GetProperty("local_id").GetString());
+        Assert.Null(exception.Details.Errors);
+        Assert.Equal(2, exception.Details.Items!.Count);
+        Assert.Equal(2, exception.Details.Items[1].Index);
+        Assert.Equal(WebServiceResponseCode.DuplicateLocalId, exception.Details.Items[1].Errors["local_id"].Code);
     }
 
     [Fact]
-    public async Task CancelDetailsAreTheOneShapeWhoseValuesAreArrays()
+    public async Task CancelDetailsKeyErrorsByRejectedId()
     {
         var (client, _) = TestClient.RespondingWithFixture("errors/error.details_cancel.json", HttpStatusCode.BadRequest);
 
@@ -94,9 +81,22 @@ public sealed class ErrorMappingTests
             () => client.Sms.CancelAsync(new Sms.Models.CancelSmsRequest { LocalIds = ["a"] }));
 
         Assert.NotNull(exception.Details);
-        var localIds = exception.Details.Value.GetProperty("local_ids").EnumerateArray()
-            .Select(element => element.GetString()).ToList();
-        Assert.Equal(["order-10001", "order-10002"], localIds);
+        Assert.Equal(WebServiceResponseCode.InvalidLocalIds, exception.Details.Errors!["order-10001"].Code);
+        Assert.Equal("INVALID_LOCAL_IDS", exception.Details.Errors["order-10002"].Name);
+    }
+
+    [Fact]
+    public async Task AnUnknownNestedCodeIsCarriedThroughNotRejected()
+    {
+        const string body = """
+            {"status":"error","error":{"code":2024,"name":"INVALID_PARAMETER","details":{"errors":{"future":{"code":2999,"name":"FUTURE_ERROR"}}}}}
+            """;
+        var (client, _) = TestClient.RespondingWith(body, HttpStatusCode.BadRequest);
+
+        var exception = await Assert.ThrowsAsync<AdsefidApiException>(() => client.User.GetInfoAsync());
+
+        Assert.Equal(2999, (int)exception.Details!.Errors!["future"].Code);
+        Assert.False(Enum.IsDefined(exception.Details.Errors["future"].Code));
     }
 
     /// <summary>

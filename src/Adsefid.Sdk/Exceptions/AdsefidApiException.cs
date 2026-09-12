@@ -1,5 +1,5 @@
-﻿using System.Text.Json;
-using Adsefid.Sdk.Enums;
+﻿using Adsefid.Sdk.Enums;
+using Adsefid.Sdk.Models.Common;
 
 namespace Adsefid.Sdk.Exceptions;
 
@@ -10,7 +10,7 @@ namespace Adsefid.Sdk.Exceptions;
 /// </summary>
 public class AdsefidApiException : AdsefidException
 {
-    public AdsefidApiException(WebServiceResponseCode code, string name, int httpStatusCode, JsonElement? details)
+    public AdsefidApiException(WebServiceResponseCode code, string name, int httpStatusCode, ApiErrorDetails? details)
         : base($"adsefid.com API returned error '{name}' ({(int)code}), HTTP status {httpStatusCode}.")
     {
         Code = code;
@@ -29,9 +29,7 @@ public class AdsefidApiException : AdsefidException
     public int HttpStatusCode { get; }
 
     /// <summary>
-    /// Additional error detail, whose JSON shape is endpoint-specific — a validation map keyed by
-    /// snake_case field path, a bulk/P2P per-item list, a cancel-specific map, or <see langword="null"/>
-    /// when the API did not include any. Deserialize it defensively per endpoint if you need it.
+    /// Machine-readable field and per-item errors, or <see langword="null"/> when the API omitted details.
     /// </summary>
-    public JsonElement? Details { get; }
+    public ApiErrorDetails? Details { get; }
 }

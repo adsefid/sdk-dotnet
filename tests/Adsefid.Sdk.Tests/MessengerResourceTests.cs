@@ -53,6 +53,43 @@ public sealed class MessengerResourceTests
     }
 
     [Fact]
+    public async Task BulkItemErrorsReachTheApiForPartialAcceptance()
+    {
+        var (client, handler) = TestClient.RespondingWithFixture("envelopes/messenger.send_bulk.partial_success.json");
+
+        await client.Messenger.SendBulkAsync(new SendBulkMessengerRequest
+        {
+            Receptors =
+            [
+                new BulkMessengerReceptor { Receptor = "98912xxxxxxx" },
+                new BulkMessengerReceptor { Receptor = "", LocalId = "-invalid" },
+            ],
+            Message = "m",
+            Profile = Guid.NewGuid(),
+        });
+
+        Assert.Single(handler.Requests);
+    }
+
+    [Fact]
+    public async Task P2PItemErrorsReachTheApiForPartialAcceptance()
+    {
+        var (client, handler) = TestClient.RespondingWithFixture("envelopes/messenger.send_p2p.partial_success.json");
+
+        await client.Messenger.SendP2PAsync(new SendP2PMessengerRequest
+        {
+            Receptors =
+            [
+                new P2PMessengerReceptor { Receptor = "98912xxxxxxx", Message = "ok" },
+                new P2PMessengerReceptor { Receptor = "", Message = "", LocalId = "-invalid" },
+            ],
+            Profile = Guid.NewGuid(),
+        });
+
+        Assert.Single(handler.Requests);
+    }
+
+    [Fact]
     public async Task SendTemplateKeepsLeadingZeros()
     {
         var (client, handler) = TestClient.RespondingWithFixture("envelopes/messenger.send_template.success.json");

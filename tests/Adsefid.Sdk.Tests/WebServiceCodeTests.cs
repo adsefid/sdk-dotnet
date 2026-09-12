@@ -9,6 +9,8 @@ public sealed class WebServiceCodeTests
     [InlineData(1000, WebServiceMessageStatus.Scheduled, null)]
     [InlineData(1002, WebServiceMessageStatus.Delivered, null)]
     [InlineData(2025, null, WebServiceResponseCode.ReceptorBlacklisted)]
+    [InlineData(2046, null, WebServiceResponseCode.InvalidMessageIds)]
+    [InlineData(2047, null, WebServiceResponseCode.FileTooLarge)]
     [InlineData(2014, null, WebServiceResponseCode.InvalidReceptor)]
     // Codes this SDK does not know yet map to neither view, but stay readable as the raw int.
     [InlineData(1500, null, null)]

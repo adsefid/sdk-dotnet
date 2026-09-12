@@ -12,7 +12,7 @@ try
     var result = await client.Sms.SendSingleAsync(new SendSingleSmsRequest
     {
         Receptor = "98912****567",
-        LineNumber = "3000xxxx",
+        LineNumber = "983000XXX",
         Message = "Hello from Adsefid.Sdk",
         LocalId = "quickstart-example",
     });
@@ -29,6 +29,7 @@ catch (AdsefidRateLimitException ex)
 }
 catch (AdsefidApiException ex)
 {
-    var details = ex.Details is { } d ? d.GetRawText() : "(none)";
-    Console.WriteLine($"API error {ex.Name} ({(int)ex.Code}), HTTP {ex.HttpStatusCode}, details={details}");
+    var fieldErrorCount = ex.Details?.Errors?.Count ?? 0;
+    var itemErrorCount = ex.Details?.Items?.Count ?? 0;
+    Console.WriteLine($"API error {ex.Name} ({(int)ex.Code}), HTTP {ex.HttpStatusCode}, field errors={fieldErrorCount}, item errors={itemErrorCount}");
 }

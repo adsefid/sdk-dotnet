@@ -54,4 +54,6 @@ public enum WebServiceResponseCode
     InvalidFile = 2043,
     AccessDenied = 2044,
     Rejected = 2045,
+    InvalidMessageIds = 2046,
+    FileTooLarge = 2047,
 }
