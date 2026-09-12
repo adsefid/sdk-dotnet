@@ -1,5 +1,5 @@
-﻿using System.Text.Json;
-using Adsefid.Sdk.Enums;
+﻿using Adsefid.Sdk.Enums;
+using Adsefid.Sdk.Models.Common;
 
 namespace Adsefid.Sdk.Exceptions;
 
@@ -10,5 +10,5 @@ namespace Adsefid.Sdk.Exceptions;
 /// body (in which case <see cref="AdsefidApiException.Code"/> is <see cref="WebServiceResponseCode.RequestLimitReached"/>
 /// and <see cref="AdsefidApiException.Details"/> is <see langword="null"/>).
 /// </summary>
-public sealed class AdsefidRateLimitException(WebServiceResponseCode code, string name, int httpStatusCode, JsonElement? details)
+public sealed class AdsefidRateLimitException(WebServiceResponseCode code, string name, int httpStatusCode, ApiErrorDetails? details)
     : AdsefidApiException(code, name, httpStatusCode, details);

@@ -47,10 +47,10 @@ public sealed class MessengerResource
 
     /// <summary>Sends the same Messenger message to multiple receptors in one call. <c>POST /v1/messenger/bulk</c>.</summary>
     /// <exception cref="AdsefidValidationException">
-    /// <see cref="SendBulkMessengerRequest.Receptors"/> is empty; <see cref="SendBulkMessengerRequest.Message"/>
-    /// is empty or exceeds 4000 characters; a receptor's <see cref="BulkMessengerReceptor.Receptor"/>
-    /// is empty; or a receptor's <see cref="BulkMessengerReceptor.LocalId"/> is not a valid local id.
+    /// <see cref="SendBulkMessengerRequest.Receptors"/>, <see cref="SendBulkMessengerRequest.Message"/>, or
+    /// <see cref="SendBulkMessengerRequest.Profile"/> is empty; or the message exceeds 4000 characters.
     /// </exception>
+    /// <remarks>Item-level errors are returned in the partial-success response.</remarks>
     public async Task<SendBulkMessengerResponse> SendBulkAsync(SendBulkMessengerRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -58,12 +58,6 @@ public sealed class MessengerResource
         Validation.RequireNonEmpty(request.Message, nameof(request.Message));
         Validation.RequireMaxLength(request.Message, Limits.MessengerMessageMaxLength, nameof(request.Message));
         Validation.RequireNonEmpty(request.Profile, nameof(request.Profile));
-
-        foreach (var receptor in request.Receptors)
-        {
-            Validation.RequireNonEmpty(receptor.Receptor, nameof(receptor.Receptor));
-            Validation.ValidateLocalId(receptor.LocalId, nameof(receptor.LocalId));
-        }
 
         return await _executor.PostJsonAsync(
             "/v1/messenger/bulk",
@@ -75,24 +69,14 @@ public sealed class MessengerResource
 
     /// <summary>Sends a distinct Messenger message to each receptor (person-to-person) in one call. <c>POST /v1/messenger/p2p</c>.</summary>
     /// <exception cref="AdsefidValidationException">
-    /// <see cref="SendP2PMessengerRequest.Receptors"/> is empty; a receptor's
-    /// <see cref="P2PMessengerReceptor.Receptor"/> or <see cref="P2PMessengerReceptor.Message"/> is
-    /// empty; a receptor's <see cref="P2PMessengerReceptor.Message"/> exceeds 4000 characters; or a
-    /// receptor's <see cref="P2PMessengerReceptor.LocalId"/> is not a valid local id.
+    /// <see cref="SendP2PMessengerRequest.Receptors"/> or <see cref="SendP2PMessengerRequest.Profile"/> is empty.
     /// </exception>
+    /// <remarks>Item-level errors are returned in the partial-success response.</remarks>
     public async Task<SendP2PMessengerResponse> SendP2PAsync(SendP2PMessengerRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         Validation.RequireNonEmptyCollection(request.Receptors, nameof(request.Receptors));
         Validation.RequireNonEmpty(request.Profile, nameof(request.Profile));
-
-        foreach (var receptor in request.Receptors)
-        {
-            Validation.RequireNonEmpty(receptor.Receptor, nameof(receptor.Receptor));
-            Validation.RequireNonEmpty(receptor.Message, nameof(receptor.Message));
-            Validation.RequireMaxLength(receptor.Message, Limits.MessengerMessageMaxLength, nameof(receptor.Message));
-            Validation.ValidateLocalId(receptor.LocalId, nameof(receptor.LocalId));
-        }
 
         return await _executor.PostJsonAsync(
             "/v1/messenger/p2p",

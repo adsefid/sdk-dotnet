@@ -49,9 +49,9 @@ public sealed class SmsResource
     /// <exception cref="AdsefidValidationException">
     /// <see cref="SendBulkSmsRequest.Receptors"/> is empty; <see cref="SendBulkSmsRequest.Message"/>
     /// or <see cref="SendBulkSmsRequest.LineNumber"/> is empty; <see cref="SendBulkSmsRequest.Message"/>
-    /// exceeds 900 characters; a receptor's <see cref="BulkSmsReceptor.Receptor"/> is empty; or a
-    /// receptor's <see cref="BulkSmsReceptor.LocalId"/> is not a valid local id.
+    /// exceeds 900 characters.
     /// </exception>
+    /// <remarks>Item-level errors are returned in the partial-success response.</remarks>
     public async Task<SendBulkSmsResponse> SendBulkAsync(SendBulkSmsRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -59,12 +59,6 @@ public sealed class SmsResource
         Validation.RequireNonEmpty(request.Message, nameof(request.Message));
         Validation.RequireMaxLength(request.Message, Limits.SmsMessageMaxLength, nameof(request.Message));
         Validation.RequireNonEmpty(request.LineNumber, nameof(request.LineNumber));
-
-        foreach (var receptor in request.Receptors)
-        {
-            Validation.RequireNonEmpty(receptor.Receptor, nameof(receptor.Receptor));
-            Validation.ValidateLocalId(receptor.LocalId, nameof(receptor.LocalId));
-        }
 
         return await _executor.PostJsonAsync(
             "/v1/sms/bulk",
@@ -77,23 +71,14 @@ public sealed class SmsResource
     /// <summary>Sends a distinct message to each receptor (person-to-person) in one call. <c>POST /v1/sms/p2p</c>.</summary>
     /// <exception cref="AdsefidValidationException">
     /// <see cref="SendP2PSmsRequest.Messages"/> or <see cref="SendP2PSmsRequest.LineNumber"/> is
-    /// empty; a message's <see cref="P2PSmsMessage.Receptor"/> or <see cref="P2PSmsMessage.Message"/>
-    /// is empty; a message's <see cref="P2PSmsMessage.Message"/> exceeds 900 characters; or a
-    /// message's <see cref="P2PSmsMessage.LocalId"/> is not a valid local id.
+    /// empty.
     /// </exception>
+    /// <remarks>Item-level errors are returned in the partial-success response.</remarks>
     public async Task<SendP2PSmsResponse> SendP2PAsync(SendP2PSmsRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         Validation.RequireNonEmptyCollection(request.Messages, nameof(request.Messages));
         Validation.RequireNonEmpty(request.LineNumber, nameof(request.LineNumber));
-
-        foreach (var message in request.Messages)
-        {
-            Validation.RequireNonEmpty(message.Receptor, nameof(message.Receptor));
-            Validation.RequireNonEmpty(message.Message, nameof(message.Message));
-            Validation.RequireMaxLength(message.Message, Limits.SmsMessageMaxLength, nameof(message.Message));
-            Validation.ValidateLocalId(message.LocalId, nameof(message.LocalId));
-        }
 
         return await _executor.PostJsonAsync(
             "/v1/sms/p2p",

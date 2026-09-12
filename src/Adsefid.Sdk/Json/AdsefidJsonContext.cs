@@ -12,6 +12,9 @@ namespace Adsefid.Sdk.Json;
 // explicit null. It affects writing only, so response parsing is unchanged.
 [JsonSourceGenerationOptions(WriteIndented = false, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(ErrorEnvelope))]
+[JsonSerializable(typeof(ApiErrorDetails))]
+[JsonSerializable(typeof(ApiFieldError))]
+[JsonSerializable(typeof(ApiItemError))]
 [JsonSerializable(typeof(SendSingleSmsRequest))]
 [JsonSerializable(typeof(ResponseEnvelope<SendSingleSmsResponse>))]
 [JsonSerializable(typeof(SendBulkSmsRequest))]

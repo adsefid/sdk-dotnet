@@ -36,7 +36,7 @@ var client = new AdsefidClient(new AdsefidClientOptions
 var result = await client.Sms.SendSingleAsync(new SendSingleSmsRequest
 {
     Receptor = "98912****567",
-    LineNumber = "3000xxxx",
+    LineNumber = "983000XXX",
     Message = "Hello from Adsefid.Sdk",
     LocalId = "order-10001",
 });
@@ -166,9 +166,12 @@ catch (AdsefidRateLimitException ex)
 catch (AdsefidApiException ex)
 {
     Console.WriteLine($"API error {ex.Code} ({ex.Name}), HTTP {ex.HttpStatusCode}");
-    if (ex.Details is { } details)
+    if (ex.Details?.Errors is { } errors)
     {
-        Console.WriteLine(details.GetRawText());
+        foreach (var (field, error) in errors)
+        {
+            Console.WriteLine($"{field}: {error.Name} ({(int)error.Code})");
+        }
     }
 }
 catch (AdsefidValidationException ex)
@@ -183,25 +186,18 @@ catch (AdsefidTransportException ex)
 }
 ```
 
-`AdsefidApiException.Details` is a loosely-typed `JsonElement?` because its shape is endpoint-specific.
-
-`details` is not one shape — the service picks one per endpoint:
-
-| When | Shape | Example |
-|---|---|---|
-| Request validation (`2024 INVALID_PARAMETER`) | `{"errors": {field: message}}` — snake_case field paths, **string** values | `{"errors":{"take":"invalid value for take"}}` |
-| Single send | `{field: message}` — flat, no wrapper | `{"receptor":"invalid value for receptor"}` |
-| Bulk / P2P | `{"errors": {...}, "messages": [{"index": n, "errors": {...}}]}` — `index` is the position in *your* array, so gaps are normal | `{"errors":{},"messages":[{"index":2,"errors":{"local_id":"invalid value for local_id"}}]}` |
-| Cancel | `{field: [value, ...]}` — the one shape whose values are **arrays** | `{"local_ids":["order-10001"]}` |
-| Anything else | absent or `null` | |
-
-Decode it defensively for the endpoint you called rather than assuming a single shape.
+`AdsefidApiException.Details` is an `ApiErrorDetails?`. Its optional `Errors` dictionary maps field
+names (or rejected cancel IDs) to `ApiFieldError { Code, Name }`; its optional `Items` list contains
+`ApiItemError { Index, Errors }` for rejected bulk/P2P entries. Both properties are absent when
+empty. Unknown numeric codes remain readable through the integer-backed enum.
 
 Bulk and P2P send endpoints have partial-success semantics: an HTTP 200 with `status: "success"` can
 still contain some failed items. These are **not** exceptions — they come back as a normal typed
 response (e.g. `SendBulkSmsResponse.Receptors`) where each item carries its own status/code.
+The SDK therefore validates request-level fields locally but sends each item unchanged for the API
+to accept or reject independently.
 
-Each item.s `Status` is the raw `WebServiceCode` from the service: `1000-1999` means the item was
+Each item's `Status` is the raw `WebServiceCode` from the service: `1000-1999` means the item was
 accepted and `MessageStatus` gives it as a `WebServiceMessageStatus?`; `2000` and above means that one
 item was rejected and `ErrorCode` gives it as a `WebServiceResponseCode?`. Both views are `null` for
 a code this SDK does not know yet, and `WebServiceCode.AsMessageStatus`/`AsErrorCode` do the same
@@ -256,7 +252,7 @@ await client.Sms.SendTemplateAsync(new SendTemplateSmsRequest
         ["rate"]    = 19.99m,   // a decimal, which round-trips exactly
     },
     Receptor = "09120000000",
-    LineNumber = "3000xxxx",
+    LineNumber = "983000XXX",
 });
 ```
 
@@ -284,6 +280,9 @@ await client.Messenger.SendSingleAsync(new SendSingleMessengerRequest
     FileId = upload.FileId,
 });
 ```
+
+The service enforces its documented MIME allowlist and 15 MB limit. Oversized uploads return
+`FileTooLarge` (2047, HTTP 413).
 
 ## Webhook verification
 
@@ -391,7 +390,7 @@ via `<IsPackable>false</IsPackable>`:
 
 ```bash
 export ADSEFID_API_KEY=...
-export ADSEFID_LINE_NUMBER=3000xxxx
+export ADSEFID_LINE_NUMBER=983000XXX
 
 dotnet run --project examples/Account          # account info, lines, profiles, templates; client config
 dotnet run --project examples/Quickstart       # send one SMS, with full error triage
@@ -410,7 +409,7 @@ This SDK follows Semantic Versioning independently of the API documentation.
 
 - Core SDK version: **`0.4.0`** (`Adsefid.Sdk`)
 - Dependency injection package version: **`0.1.0`** (`Adsefid.Sdk.DependencyInjection`)
-- Verified API documentation: **`v1.12.0`**
+- Verified API documentation: **`v1.13.0`**
 
 Core releases use `v<SDK_VERSION>` tags. Dependency injection releases use
 `dependency-injection-v<PACKAGE_VERSION>` tags. Package versions and API documentation versions

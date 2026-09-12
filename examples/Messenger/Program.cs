@@ -33,13 +33,13 @@ foreach (var profile in profiles)
 // A FileStream works the same way; the SDK streams whatever you hand it.
 var attachmentPath = Environment.GetEnvironmentVariable("ADSEFID_ATTACHMENT");
 await using Stream attachment = attachmentPath is null
-    ? new MemoryStream(Encoding.UTF8.GetBytes("Statement for September 2026\nTotal: 1,250,000 IRR\n"))
+    ? new MemoryStream(Encoding.ASCII.GetBytes("%PDF-1.1\n%%EOF\n"))
     : File.OpenRead(attachmentPath);
 
 var uploaded = await client.Messenger.UploadFileAsync(
     attachment,
-    Path.GetFileName(attachmentPath) ?? "statement.txt",
-    "text/plain");
+    Path.GetFileName(attachmentPath) ?? "statement.pdf",
+    "application/pdf");
 Console.WriteLine($"\nuploaded attachment as file_id {uploaded.FileId}");
 
 var sent = await client.Messenger.SendSingleAsync(new SendSingleMessengerRequest

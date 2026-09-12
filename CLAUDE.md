@@ -13,9 +13,9 @@ Equivalent SDKs exist for the same API in sibling repositories (`sdk-js`, `sdk-p
 The API surface (endpoints, field names, types, validation rules, enums, example payloads, webhook
 behavior) is defined by the published adsefid.com SMS Web Service API documentation.
 
-**Pin: this SDK is built against doc version `v1.12.0`.** Re-read the relevant section of that
+**Pin: this SDK is built against doc version `v1.13.0`.** Re-read the relevant section of that
 documentation before changing any endpoint, request/response model, or enum. If the doc has moved on
-since `v1.12.0`, diff it against what's implemented here before trusting either side.
+since `v1.13.0`, diff it against what's implemented here before trusting either side.
 
 Each package follows independent Semantic Versioning from its project `<Version>`; never copy the
 API-document version into package metadata. Record package and API-document versions in the README.
@@ -33,9 +33,11 @@ an ambiguous doc reading:
   some templates; this SDK intentionally models only the two documented values — do not add support
   for it without first confirming it against current, documented API behavior. See
   `Enums/TemplateParameterType.cs`.
-- `error.details` shape varies per endpoint and is intentionally untyped. It may be a validation map,
-  a bulk/P2P per-item list, a cancel-specific map, or absent entirely — never give it a strong type;
-  decode it defensively per endpoint if you need it.
+- `error.details` uses the shared typed `ApiErrorDetails` shape: optional `Errors` maps field names
+  (or rejected cancel IDs) to `{Code,Name}`, and optional `Items` carries indexed bulk/P2P errors.
+  Keep numeric codes forward-compatible.
+- Bulk/P2P item validation happens in the API. Validate request-level fields locally, but send item
+  values unchanged so valid siblings can still succeed.
 
 ## Architecture map
 
@@ -46,7 +48,7 @@ an ambiguous doc reading:
 | `Json/` | The single source-generated `AdsefidJsonContext` (`JsonSerializerContext`) plus the handful of custom `JsonConverter<T>` types it references (`TemplateState`, `TemplateParameterType`, `TemplateParameterValue`) |
 | `Exceptions/` | The typed exception hierarchy every failure surfaces through |
 | `Enums/` | `LineSelector`, `WebServiceMessageStatus`, `WebServiceResponseCode`, `TemplateState`, `TemplateParameterType`, plus the `WebServiceCode` range helpers behind the per-item `MessageStatus`/`ErrorCode` views on bulk/P2P results |
-| `Models/Common/` | Shapes shared across resources: `ResponseEnvelope<T>`, `ApiErrorPayload`/`ErrorEnvelope`, `TemplateParameterValue` |
+| `Models/Common/` | Shapes shared across resources: `ResponseEnvelope<T>`, `ApiErrorPayload`/`ErrorEnvelope`, typed `ApiErrorDetails`/field/item errors, `TemplateParameterValue` |
 | `Sms/`, `Messenger/`, `User/` | One resource client per API area (`SmsResource`, `MessengerResource`, `UserResource`) plus their `Models/` request/response types |
 | `Webhooks/` | `WebhookVerifier` (signature + timestamp verification, payload dispatch), the `WebhookEvent` record hierarchy, and `WebhookHeaderNames`/`WebhookEventTypes` constants (use these instead of typing header/type strings) |
 

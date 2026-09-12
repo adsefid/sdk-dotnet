@@ -126,6 +126,43 @@ public sealed class SmsResourceTests
         Assert.Equal([null, WebServiceResponseCode.InvalidReceptor], result.Messages.Select(message => message.ErrorCode));
     }
 
+    [Fact]
+    public async Task BulkItemErrorsReachTheApiForPartialAcceptance()
+    {
+        var (client, handler) = TestClient.RespondingWithFixture("envelopes/sms.send_bulk.partial_success.json");
+
+        await client.Sms.SendBulkAsync(new SendBulkSmsRequest
+        {
+            Receptors =
+            [
+                new BulkSmsReceptor { Receptor = "98912xxxxxxx" },
+                new BulkSmsReceptor { Receptor = "", LocalId = "-invalid" },
+            ],
+            Message = "m",
+            LineNumber = "3000xxxx",
+        });
+
+        Assert.Single(handler.Requests);
+    }
+
+    [Fact]
+    public async Task P2PItemErrorsReachTheApiForPartialAcceptance()
+    {
+        var (client, handler) = TestClient.RespondingWithFixture("envelopes/sms.send_p2p.partial_success.json");
+
+        await client.Sms.SendP2PAsync(new SendP2PSmsRequest
+        {
+            Messages =
+            [
+                new P2PSmsMessage { Receptor = "98912xxxxxxx", Message = "ok" },
+                new P2PSmsMessage { Receptor = "", Message = "", LocalId = "-invalid" },
+            ],
+            LineNumber = "3000xxxx",
+        });
+
+        Assert.Single(handler.Requests);
+    }
+
     /// <summary>
     /// A number-typed parameter sent as a string keeps its exact digits: the service substitutes
     /// such a value verbatim.
