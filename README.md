@@ -408,7 +408,7 @@ dotnet run --project examples/WebhookReceiver  # verify and dispatch inbound web
 This SDK follows Semantic Versioning independently of the API documentation.
 
 - Core SDK version: **`0.6.0`** (`Adsefid.Sdk`)
-- Dependency injection package version: **`0.1.0`** (`Adsefid.Sdk.DependencyInjection`)
+- Dependency injection package version: **`0.2.0`** (`Adsefid.Sdk.DependencyInjection`)
 - Verified API documentation: **`v1.14.0`**
 
 Core releases use `v<SDK_VERSION>` tags. Dependency injection releases use
