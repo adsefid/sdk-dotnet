@@ -112,8 +112,8 @@ public sealed class MessengerResource
             cancellationToken).ConfigureAwait(false);
     }
 
-    /// <summary>Cancels previously scheduled/queued Messenger messages, by <see cref="CancelMessengerRequest.MessageIds"/> and/or <see cref="CancelMessengerRequest.LocalIds"/>. <c>POST /v1/messenger/cancel</c>.</summary>
-    /// <exception cref="AdsefidValidationException">Both <see cref="CancelMessengerRequest.MessageIds"/> and <see cref="CancelMessengerRequest.LocalIds"/> are empty.</exception>
+    /// <summary>Cancels eligible Messenger messages by message id or local id. <c>POST /v1/messenger/cancel</c>.</summary>
+    /// <exception cref="AdsefidValidationException">Both id lists are empty, or their combined distinct count exceeds 2000.</exception>
     public async Task<CancelMessengerResponse> CancelAsync(CancelMessengerRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -121,6 +121,11 @@ public sealed class MessengerResource
             request.MessageIds is { Count: > 0 },
             request.LocalIds is { Count: > 0 },
             "At least one of 'MessageIds' or 'LocalIds' must be non-empty.");
+        Validation.RequireCombinedCountAtMost(
+            request.MessageIds?.Distinct().Count() ?? 0,
+            request.LocalIds?.Distinct(StringComparer.Ordinal).Count() ?? 0,
+            Limits.CombinedCancelIdsMax,
+            $"The combined distinct count of 'MessageIds' and 'LocalIds' must not exceed {Limits.CombinedCancelIdsMax}.");
 
         return await _executor.PostJsonAsync(
             "/v1/messenger/cancel",

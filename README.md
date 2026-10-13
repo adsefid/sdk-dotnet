@@ -132,13 +132,13 @@ transient; do not capture one in a singleton service.
 | Sms | SendP2PAsync(request) | POST /v1/sms/p2p | Partial success is a normal typed return, not an exception |
 | Sms | SendTemplateAsync(request) | POST /v1/sms/template | |
 | Sms | GetStatusAsync(messageIds?, localIds?) | GET /v1/sms/status | |
-| Sms | CancelAsync(request) | POST /v1/sms/cancel | |
+| Sms | CancelAsync(request) | POST /v1/sms/cancel | Awaiting approval, queued, or scheduled; no refund; max 2,000 distinct IDs combined |
 | Sms | GetReceivedAsync(lineNumber, count?, since?) | GET /v1/sms/receive | |
 | Messenger | SendSingleAsync(request) | POST /v1/messenger/single | |
 | Messenger | SendBulkAsync(request) | POST /v1/messenger/bulk | Partial success is a normal typed return, not an exception |
 | Messenger | SendP2PAsync(request) | POST /v1/messenger/p2p | Partial success is a normal typed return, not an exception |
 | Messenger | UploadFileAsync(fileStream, fileName, contentType) | POST /v1/messenger/file | Accepts a Stream (caller owns its lifetime) |
-| Messenger | CancelAsync(request) | POST /v1/messenger/cancel | |
+| Messenger | CancelAsync(request) | POST /v1/messenger/cancel | Awaiting approval, queued, or scheduled; no refund; max 2,000 distinct IDs combined |
 | Messenger | SendTemplateAsync(request) | POST /v1/messenger/template | |
 | Messenger | GetStatusAsync(messageIds?, localIds?) | GET /v1/messenger/status | |
 | User | GetInfoAsync() | GET /v1/user/info | |
@@ -409,7 +409,7 @@ This SDK follows Semantic Versioning independently of the API documentation.
 
 - Core SDK version: **`0.5.0`** (`Adsefid.Sdk`)
 - Dependency injection package version: **`0.1.0`** (`Adsefid.Sdk.DependencyInjection`)
-- Verified API documentation: **`v1.13.0`**
+- Verified API documentation: **`v1.14.0`**
 
 Core releases use `v<SDK_VERSION>` tags. Dependency injection releases use
 `dependency-injection-v<PACKAGE_VERSION>` tags. Package versions and API documentation versions

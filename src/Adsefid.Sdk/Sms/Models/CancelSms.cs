@@ -3,7 +3,7 @@ using Adsefid.Sdk.Enums;
 
 namespace Adsefid.Sdk.Sms.Models;
 
-/// <summary>Request for <see cref="SmsResource.CancelAsync"/>. At least one of <see cref="MessageIds"/> or <see cref="LocalIds"/> is required; only messages that haven't been sent yet (e.g. scheduled ones) can be cancelled.</summary>
+/// <summary>Request for <see cref="SmsResource.CancelAsync"/>. Requires at least one id list, with at most 2000 distinct ids combined.</summary>
 public sealed class CancelSmsRequest
 {
     [JsonPropertyName("message_ids")]

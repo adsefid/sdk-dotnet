@@ -13,9 +13,9 @@ Equivalent SDKs exist for the same API in sibling repositories (`sdk-js`, `sdk-p
 The API surface (endpoints, field names, types, validation rules, enums, example payloads, webhook
 behavior) is defined by the published adsefid.com SMS Web Service API documentation.
 
-**Pin: this SDK is built against doc version `v1.13.0`.** Re-read the relevant section of that
+**Pin: this SDK is built against doc version `v1.14.0`.** Re-read the relevant section of that
 documentation before changing any endpoint, request/response model, or enum. If the doc has moved on
-since `v1.13.0`, diff it against what's implemented here before trusting either side.
+since `v1.14.0`, diff it against what's implemented here before trusting either side.
 
 Each package follows independent Semantic Versioning from its project `<Version>`; never copy the
 API-document version into package metadata. Record package and API-document versions in the README.
