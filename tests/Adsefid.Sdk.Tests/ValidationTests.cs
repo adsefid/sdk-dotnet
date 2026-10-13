@@ -115,6 +115,7 @@ public sealed class ValidationTests
         Assert.Equal(Limits.SmsMessageMaxLength, limits.GetProperty("sms_message_max_length").GetInt32());
         Assert.Equal(Limits.MessengerMessageMaxLength, limits.GetProperty("messenger_message_max_length").GetInt32());
         Assert.Equal(Limits.CombinedStatusIdsMax, limits.GetProperty("combined_status_ids_max").GetInt32());
+        Assert.Equal(Limits.CombinedCancelIdsMax, limits.GetProperty("combined_cancel_ids_max").GetInt32());
         Assert.Equal(Limits.ReceiveCountMin, limits.GetProperty("receive_count_min").GetInt32());
         Assert.Equal(Limits.ReceiveCountMax, limits.GetProperty("receive_count_max").GetInt32());
         Assert.Equal(Limits.TemplatesTakeMin, limits.GetProperty("templates_take_min").GetInt32());

@@ -15,6 +15,9 @@ internal static class Limits
     /// <summary>Maximum combined count of distinct message ids and local ids in one lookup.</summary>
     public const int CombinedStatusIdsMax = 2000;
 
+    /// <summary>Maximum distinct cancel ids across both lists.</summary>
+    public const int CombinedCancelIdsMax = 2000;
+
     /// <summary>Minimum accepted value for the inbound-message <c>count</c> parameter.</summary>
     public const int ReceiveCountMin = 1;
 
