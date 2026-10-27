@@ -252,4 +252,26 @@ public sealed class WebhookVerifierTests
         Assert.Equal("status", WebhookEventTypes.Status);
         Assert.Equal("messenger.status", WebhookEventTypes.MessengerStatus);
     }
+
+    [Fact]
+    public void AnEmptyKeyNeverVerifies()
+    {
+        var vector = Vector();
+        var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var signature = "v1=" + Convert.ToBase64String(HMACSHA256.HashData(Array.Empty<byte>(), Encoding.UTF8.GetBytes($"{timestamp}.{BodyText()}")));
+
+        Assert.Throws<AdsefidWebhookVerificationException>(() => { WebhookVerifier.VerifyAndParse(vector.Body, signature, timestamp, ReadOnlySpan<byte>.Empty); });
+        Assert.Throws<AdsefidWebhookVerificationException>(() => { WebhookVerifier.VerifyAndParse(vector.Body, signature, timestamp, string.Empty); });
+    }
+
+    [Theory]
+    [InlineData("v1=é")]
+    [InlineData("v1=!!!!")]
+    [InlineData("v1=AAAA")]
+    public void AMalformedSignatureIsRejectedAsAVerificationFailure(string signature)
+    {
+        var vector = Vector();
+
+        Assert.Throws<AdsefidWebhookVerificationException>(() => { WebhookVerifier.VerifyAndParse(vector.Body, signature, vector.Timestamp, vector.Secret, ACentury); });
+    }
 }

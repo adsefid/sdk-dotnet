@@ -11,6 +11,8 @@ using Adsefid.Sdk.Sms.Models;
 
 var apiKey = Environment.GetEnvironmentVariable("ADSEFID_API_KEY");
 var lineNumber = Environment.GetEnvironmentVariable("ADSEFID_LINE_NUMBER");
+// Needed when the number has several lines; the value is a LineSelector name.
+LineSelector? lineSelector = Enum.TryParse<LineSelector>(Environment.GetEnvironmentVariable("ADSEFID_LINE_SELECTOR"), out var selector) ? selector : null;
 if (string.IsNullOrEmpty(apiKey) || string.IsNullOrEmpty(lineNumber))
 {
     Console.Error.WriteLine("set ADSEFID_API_KEY and ADSEFID_LINE_NUMBER");
@@ -48,6 +50,7 @@ var result = await client.Sms.SendTemplateAsync(new SendTemplateSmsRequest
     Parameters = parameters,
     Receptor = "09120000000",
     LineNumber = lineNumber,
+    LineSelector = lineSelector,
     ExpiryDate = DateTimeOffset.UtcNow.AddMinutes(10),
 });
 

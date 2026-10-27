@@ -28,14 +28,21 @@ an ambiguous doc reading:
   literal string `"{timestamp}.{raw_body}"`, and the raw digest bytes are Base64-encoded directly —
   there is no intermediate hex-encoding step, even though a literal reading of some spec pseudo-code
   can suggest one. See `Webhooks/WebhookVerifier.cs`.
-- `TemplateParameterType` has an undocumented third value in the wild. The documented, supported
-  public set is `{string, number}`. The live API has been observed to also emit a `Url` value for
-  some templates; this SDK intentionally models only the two documented values — do not add support
-  for it without first confirming it against current, documented API behavior. See
+- `TemplateState` and `TemplateParameterType` are extensible `readonly record struct` values: named
+  members for the documented values only, and any other wire value is preserved in `.Value`, never
+  dropped or thrown on. Add a named member only for a value the documentation lists. See
   `Enums/TemplateParameterType.cs`.
 - `error.details` uses the shared typed `ApiErrorDetails` shape: optional `Errors` maps field names
   (or rejected cancel IDs) to `{Code,Name}`, and optional `Items` carries indexed bulk/P2P errors.
   Keep numeric codes forward-compatible.
+- `line_selector` is required when the account has two or more lines with the same number. Without
+  it the service answers `LINE_NOT_FOUND` (2002), even for a number the account owns.
+- GET requests are capped at 8,000 characters of path and query. The service's proxy answers an HTML
+  HTTP 414 above 8 KiB, so the documented 2,000-ID status lookup cannot be sent as one GET (about 200
+  IDs fit). The SDK joins IDs with literal commas, drops duplicates, and refuses an oversized GET
+  locally with its validation error. Cancel is a POST and is not affected.
+- Timestamps carry up to 7 fractional digits (`2026-09-19T11:43:10.4030292+03:30`) and mixed offsets;
+  parsers must accept both.
 - Bulk/P2P item validation happens in the API. Validate request-level fields locally, but send item
   values unchanged so valid siblings can still succeed.
 
@@ -89,6 +96,12 @@ an ambiguous doc reading:
   overload for a pre-decoded key. The primary overloads take the raw body as `ReadOnlySpan<byte>`;
   the `string` overloads re-encode as UTF-8 and exist for convenience only. Keying the HMAC with the UTF-8 bytes of the Base64 string does not
   verify against the live service.
+- **An empty webhook key is rejected** (an empty HMAC key signs anything), and verification compares
+  decoded digest bytes without allocating. `ResponseEnvelope<T>`, `ErrorEnvelope` and `ApiErrorPayload`
+  are internal wire shapes, not public API.
+- **Uploads never dispose the caller's stream** (it is wrapped in `NonDisposingStream`), validate the
+  media type, and cap seekable content at `Limits.MessengerFileMaxBytes`. The default `HttpClient` is
+  built on a `SocketsHttpHandler` with a bounded connection lifetime.
 - **Request bodies omit nulls.** `AdsefidJsonContext` sets
   `DefaultIgnoreCondition = WhenWritingNull`, so an unset optional is absent from the body rather
   than an explicit `null`, matching the sibling SDKs.
@@ -105,8 +118,7 @@ an ambiguous doc reading:
 - Public API surface gets XML doc comments (`/// <summary>`) with real content — behavior, units,
   formats, and which exceptions a member throws and when — not comments that just restate the member
   name. Internal/private implementation gets no comments except where a genuinely non-obvious
-  constraint requires one (e.g. the webhook signature's "no hex intermediate step" note, or the
-  undocumented `TemplateParameterType.Url` note). No narration comments anywhere.
+  constraint requires one (e.g. the webhook signature's "no hex intermediate step" note). No narration comments anywhere.
 - Throw on error, always. Never introduce a `Result`/`Either`-style return wrapper — resource methods
   return the strongly-typed success payload directly and throw a typed `AdsefidException` subclass
   otherwise. Bulk/P2P partial-success items are data, not exceptions — see their own per-item

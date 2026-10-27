@@ -3,23 +3,20 @@
 [![CI](https://github.com/adsefid/sdk-dotnet/actions/workflows/ci.yml/badge.svg)](https://github.com/adsefid/sdk-dotnet/actions/workflows/ci.yml)
 [![NuGet](https://img.shields.io/nuget/v/Adsefid.Sdk.svg)](https://www.nuget.org/packages/Adsefid.Sdk)
 
-A .NET client SDK for the [adsefid.com SMS Web Service](https://adsefid.com) REST API: SMS, Messenger and User
-endpoints, plus outgoing webhook signature verification.
+A .NET client for the [adsefid.com](https://adsefid.com) SMS Web Service API. It sends SMS and
+Messenger messages (single, bulk, P2P and template), checks delivery status, cancels unsent
+messages, reads inbound SMS, looks up account data, and verifies signed webhooks.
 
-- Single target framework: `net8.0`
-- Core package has zero external dependencies (BCL only) and zero reflection — JSON is handled by
-  a source-generated `System.Text.Json` serializer context
-- Optional `Adsefid.Sdk.DependencyInjection` package integrates with `IHttpClientFactory`
-- Throws typed exceptions on error; never returns a `Result`/`Either` wrapper
-
-## Requirements
-
-- .NET 8.0 SDK or later
+The core package targets `net8.0`, has no dependencies beyond the BCL, and uses a source-generated
+`System.Text.Json` context, so it works with trimming and Native AOT. It is verified against API
+documentation **v1.14.0**. Sibling SDKs exist for Go, JavaScript, PHP and Python with the same
+shape.
 
 ## Install
 
 ```bash
 dotnet add package Adsefid.Sdk
+dotnet add package Adsefid.Sdk.DependencyInjection   # optional, for IHttpClientFactory
 ```
 
 ## Quickstart
@@ -35,8 +32,9 @@ var client = new AdsefidClient(new AdsefidClientOptions
 
 var result = await client.Sms.SendSingleAsync(new SendSingleSmsRequest
 {
-    Receptor = "98912****567",
-    LineNumber = "983000XXX",
+    Receptor = "989120000000",
+    LineNumber = "983000",
+    LineSelector = LineSelector.BulkServiceSendBased,
     Message = "Hello from Adsefid.Sdk",
     LocalId = "order-10001",
 });
@@ -44,18 +42,13 @@ var result = await client.Sms.SendSingleAsync(new SendSingleSmsRequest
 Console.WriteLine($"message_id={result.MessageId} status={result.Status} cost={result.Cost}");
 ```
 
-A runnable version of this is in [`examples/Quickstart`](examples/Quickstart).
+The SDK never reads environment variables. Pass the API key yourself. It goes out as the
+`X-API-KEY` header on every request. Create one `AdsefidClient` and reuse it; it is safe to share
+across threads.
 
-## Auth setup
-
-The SDK never reads environment variables itself — read your API key explicitly and pass it in:
-
-```csharp
-var apiKey = Environment.GetEnvironmentVariable("ADSEFID_API_KEY")
-    ?? throw new InvalidOperationException("ADSEFID_API_KEY is not set.");
-
-var client = new AdsefidClient(new AdsefidClientOptions { ApiKey = apiKey });
-```
+**Line selector.** An account can own several lines with the same number, each with its own
+selector (see `client.User.GetLinesAsync()`). When it does, `LineSelector` is required on every SMS
+send; without it the service answers `LineNotFound`.
 
 ## Configuration
 
@@ -63,104 +56,134 @@ var client = new AdsefidClient(new AdsefidClientOptions { ApiKey = apiKey });
 var client = new AdsefidClient(new AdsefidClientOptions
 {
     ApiKey = apiKey,
-
-    // Override the base URL (defaults to "https://api.adsefid.com")
-    BaseUrl = "https://api.adsefid.com",
-
-    // Defaults to "adsefid-dotnet/<SDK_VERSION>".
-    UserAgent = "my-service/1.0.0",
-
-    // Supply your own HttpClient, e.g. one created via IHttpClientFactory.
-    // When omitted, every AdsefidClient shares one static HttpClient. The SDK
-    // always sends the absolute request URI and the X-API-KEY header itself,
-    // so the client you supply needs no BaseAddress or default headers.
-    HttpClient = httpClientFactory.CreateClient("adsefid"),
+    BaseUrl = "https://api.adsefid.com",              // default
+    UserAgent = "my-service/1.0.0",                   // default: adsefid-dotnet/<SDK_VERSION>
+    HttpClient = httpClientFactory.CreateClient("adsefid"), // optional
 });
 ```
 
-To control timeouts, configure them on the `HttpClient` you supply (`HttpClient.Timeout`, or via
-`IHttpClientFactory` handler configuration) — the SDK does not impose its own timeout.
+Without a custom `HttpClient`, all clients share one static instance whose pooled connections
+are recycled every two minutes, so DNS changes are picked up. The SDK sets the absolute request
+URI and the API key header itself, so your client needs no `BaseAddress`. The SDK imposes no
+timeout of its own: set `HttpClient.Timeout`, or pass a `CancellationToken` to any call.
 
-Monetary response properties (`Cost`, `TotalCost`, and `CreditLeft`) use `decimal` and may contain fractional values.
-
-## Dependency injection
-
-Install the optional companion package. It includes the core SDK transitively:
-
-```bash
-dotnet add package Adsefid.Sdk.DependencyInjection
-```
-
-Register `AdsefidClient` as a typed HTTP client:
+### Dependency injection
 
 ```csharp
-using Adsefid.Sdk;
-using Adsefid.Sdk.Sms.Models;
-using Microsoft.Extensions.DependencyInjection;
-
 builder.Services
     .AddAdsefid(_ => new AdsefidClientOptions
     {
         ApiKey = builder.Configuration["Adsefid:ApiKey"]
             ?? throw new InvalidOperationException("Adsefid:ApiKey is not set."),
     })
-    .ConfigureHttpClient(httpClient => httpClient.Timeout = TimeSpan.FromSeconds(30));
+    .ConfigureHttpClient(http => http.Timeout = TimeSpan.FromSeconds(30));
 ```
 
-Inject the concrete client into transient or scoped services:
+`AddAdsefid` returns an `IHttpClientBuilder`, so handlers, proxies, logging and timeouts go
+there. Do not set `HttpClient` in the options factory. Typed clients are transient, so inject
+`AdsefidClient` into transient or scoped services and do not capture it in a singleton.
+
+## Methods
+
+Every method is async, takes an optional `CancellationToken`, and returns the typed response.
+
+| Resource | Methods | Endpoint |
+|---|---|---|
+| `client.Sms` | `SendSingleAsync`, `SendBulkAsync`, `SendP2PAsync`, `SendTemplateAsync` | `POST /v1/sms/{single,bulk,p2p,template}` |
+| `client.Sms` | `GetStatusAsync(messageIds?, localIds?)`, `CancelAsync`, `GetReceivedAsync(lineNumber, count?, since?)` | `GET /v1/sms/status`, `POST /v1/sms/cancel`, `GET /v1/sms/receive` |
+| `client.Messenger` | `SendSingleAsync`, `SendBulkAsync`, `SendP2PAsync`, `SendTemplateAsync` | `POST /v1/messenger/{single,bulk,p2p,template}` |
+| `client.Messenger` | `UploadFileAsync(stream, fileName, contentType)` | `POST /v1/messenger/file` |
+| `client.Messenger` | `GetStatusAsync(messageIds?, localIds?)`, `CancelAsync` | `GET /v1/messenger/status`, `POST /v1/messenger/cancel` |
+| `client.User` | `GetInfoAsync`, `GetLinesAsync`, `GetProfilesAsync`, `GetTemplatesAsync(state?, skip?, take?)` | `GET /v1/user/{info,lines,profiles,templates}` |
+
+Cancel accepts messages that are awaiting approval, queued or scheduled, with no refund, and at
+most 2,000 distinct IDs across both lists. Status lookups are GET requests, so the URL caps them at about 200 IDs per call. The SDK raises a validation error past 8,000 URL characters instead of letting the gateway answer HTTP 414.
+
+## Bulk and P2P: partial success is not an error
+
+A bulk or P2P call returns HTTP 200 even when some items are rejected. Each item's `Status` is
+either a message status (1000 to 1999) or an error code (2000 and up). `MessageStatus` and
+`ErrorCode` give the typed enum for the matching range, and are `null` for the other range or for
+a code this SDK does not know yet:
 
 ```csharp
-public sealed class MessageSender(AdsefidClient client)
+foreach (var item in result.Receptors)
 {
-    public Task<SendSingleSmsResponse> SendAsync(
-        SendSingleSmsRequest request,
-        CancellationToken cancellationToken = default) =>
-        client.Sms.SendSingleAsync(request, cancellationToken);
+    Console.WriteLine(item.ErrorCode is { } error
+        ? $"{item.Receptor}: rejected ({error})"
+        : $"{item.Receptor}: {item.MessageStatus?.ToString() ?? item.Status.ToString()}");
 }
 ```
 
-`AddAdsefid` returns `IHttpClientBuilder`, so configure handlers, proxies, logging, and timeouts on
-that builder. Do not set `AdsefidClientOptions.HttpClient` in the options factory. Typed clients are
-transient; do not capture one in a singleton service.
+Item values reach the API unchanged, so valid items still go out. If every item is rejected, the
+call throws `AdsefidApiException` with `Details.Items` listing each rejected index. Only
+request-level fields are checked locally.
 
-## Resource reference
+## Template parameters
 
-| Resource | SDK method | HTTP endpoint | Notes |
-|---|---|---|---|
-| Sms | SendSingleAsync(request) | POST /v1/sms/single | |
-| Sms | SendBulkAsync(request) | POST /v1/sms/bulk | Partial success is a normal typed return, not an exception |
-| Sms | SendP2PAsync(request) | POST /v1/sms/p2p | Partial success is a normal typed return, not an exception |
-| Sms | SendTemplateAsync(request) | POST /v1/sms/template | |
-| Sms | GetStatusAsync(messageIds?, localIds?) | GET /v1/sms/status | |
-| Sms | CancelAsync(request) | POST /v1/sms/cancel | Awaiting approval, queued, or scheduled; no refund; max 2,000 distinct IDs combined |
-| Sms | GetReceivedAsync(lineNumber, count?, since?) | GET /v1/sms/receive | |
-| Messenger | SendSingleAsync(request) | POST /v1/messenger/single | |
-| Messenger | SendBulkAsync(request) | POST /v1/messenger/bulk | Partial success is a normal typed return, not an exception |
-| Messenger | SendP2PAsync(request) | POST /v1/messenger/p2p | Partial success is a normal typed return, not an exception |
-| Messenger | UploadFileAsync(fileStream, fileName, contentType) | POST /v1/messenger/file | Accepts a Stream (caller owns its lifetime) |
-| Messenger | CancelAsync(request) | POST /v1/messenger/cancel | Awaiting approval, queued, or scheduled; no refund; max 2,000 distinct IDs combined |
-| Messenger | SendTemplateAsync(request) | POST /v1/messenger/template | |
-| Messenger | GetStatusAsync(messageIds?, localIds?) | GET /v1/messenger/status | |
-| User | GetInfoAsync() | GET /v1/user/info | |
-| User | GetLinesAsync() | GET /v1/user/lines | |
-| User | GetProfilesAsync() | GET /v1/user/profiles | |
-| User | GetTemplatesAsync(state?, skip?, take?) | GET /v1/user/templates | |
-
-## Error handling
-
-Every resource method throws on failure instead of returning a result wrapper:
+A parameter the template declares as `number` can be sent as a number or a string. The service
+substitutes a numeric string as written, so a string is the only way to keep exact digits:
 
 ```csharp
-using Adsefid.Sdk.Enums;
-using Adsefid.Sdk.Exceptions;
+await client.Sms.SendTemplateAsync(new SendTemplateSmsRequest
+{
+    TemplateId = "invoice_notice",
+    Parameters = new Dictionary<string, TemplateParameterValue>
+    {
+        ["invoice"] = "001234", // renders 001234, not 1234
+        ["amount"]  = "1.50",   // renders 1.50, not 1.5
+        ["count"]   = 2,
+        ["rate"]    = 19.99m,   // decimal round-trips exactly
+    },
+    Receptor = "09120000000",
+    LineNumber = "983000",
+    LineSelector = LineSelector.BulkServiceSendBased,
+});
+```
 
+`TemplateParameterValue` converts implicitly from `string`, `int`, `long`, `decimal` and
+`double`. Read a value back with `AsString` or `AsNumber`. A `default` value is unassigned and
+throws when serialized. Money fields (`Cost`, `TotalCost`, `CreditLeft`) are `decimal`.
+
+## File upload
+
+```csharp
+using var fileStream = File.OpenRead("brochure.pdf");
+var upload = await client.Messenger.UploadFileAsync(fileStream, "brochure.pdf", "application/pdf");
+
+await client.Messenger.SendSingleAsync(new SendSingleMessengerRequest
+{
+    Message = "See attached brochure",
+    Receptor = "989120000000",
+    Profile = profileId,
+    FileId = upload.FileId,
+});
+```
+
+File content is limited to 15 MiB inclusive (`MessengerResource.MaxFileBytes`). A seekable
+stream above that limit throws `AdsefidValidationException` before any request is sent; the
+service answers `FileTooLarge` (2047) for anything else that is too large and enforces a MIME
+allowlist. The SDK reads your stream but never closes it. `contentType` must be a valid media type.
+
+## Errors
+
+Every failure is a typed exception. All derive from `AdsefidException`.
+
+| Exception | Meaning |
+|---|---|
+| `AdsefidValidationException` | A local check failed. No request was sent. |
+| `AdsefidApiException` | The API returned an error envelope, or a non-2xx status without one. Has `Code`, `Name`, `HttpStatusCode` and optional `Details`. |
+| `AdsefidRateLimitException` | Derives from `AdsefidApiException`. Codes 2035 and 2036, or any HTTP 429. |
+| `AdsefidTransportException` | Network failure, timeout, or a response body that could not be parsed. |
+| `AdsefidWebhookVerificationException` | A webhook failed verification. |
+
+```csharp
 try
 {
     var result = await client.Sms.SendSingleAsync(request);
 }
-catch (AdsefidRateLimitException ex)
+catch (AdsefidRateLimitException ex)    // catch before the base type
 {
-    // ex.Code is MessageLimitReached (2035) or RequestLimitReached (2036)
     Console.WriteLine($"Rate limited: {ex.Name}");
 }
 catch (AdsefidApiException ex)
@@ -176,245 +199,105 @@ catch (AdsefidApiException ex)
 }
 catch (AdsefidValidationException ex)
 {
-    // Thrown client-side, before any network call (e.g. an invalid local_id format)
     Console.WriteLine($"Invalid request: {ex.Message}");
 }
 catch (AdsefidTransportException ex)
 {
-    // Network, DNS, or timeout failure
     Console.WriteLine($"Transport error: {ex.Message}");
 }
 ```
 
-`AdsefidApiException.Details` is an `ApiErrorDetails?`. Its optional `Errors` dictionary maps field
-names (or rejected cancel IDs) to `ApiFieldError { Code, Name }`; its optional `Items` list contains
-`ApiItemError { Index, Errors }` for rejected bulk/P2P entries. Both properties are absent when
-empty. Unknown numeric codes remain readable through the integer-backed enum.
+A non-2xx response with no error envelope has code `-1` and name `UNKNOWN_ERROR`. A bare 429 has
+code 2036 and name `RATE_LIMITED`. `Details.Errors` maps field names (or rejected cancel IDs) to
+`{ Code, Name }`, and `Details.Items` carries indexed bulk/P2P errors. The SDK sends each request
+once and never retries. Add backoff in your own `HttpClient` handler if you need it.
 
-Bulk and P2P send endpoints have partial-success semantics: an HTTP 200 with `status: "success"` can
-still contain some failed items. These are **not** exceptions — they come back as a normal typed
-response (e.g. `SendBulkSmsResponse.Receptors`) where each item carries its own status/code.
-The SDK therefore validates request-level fields locally but sends each item unchanged for the API
-to accept or reject independently.
+## Enums and unknown values
 
-Each item's `Status` is the raw `WebServiceCode` from the service: `1000-1999` means the item was
-accepted and `MessageStatus` gives it as a `WebServiceMessageStatus?`; `2000` and above means that one
-item was rejected and `ErrorCode` gives it as a `WebServiceResponseCode?`. Both views are `null` for
-a code this SDK does not know yet, and `WebServiceCode.AsMessageStatus`/`AsErrorCode` do the same
-split for any raw value:
+`LineSelector`, `WebServiceMessageStatus` and `WebServiceResponseCode` are enums in
+`Adsefid.Sdk.Enums`. `TemplateState` and `TemplateParameterType` are value types with named
+members (`TemplateState.Approved`, `TemplateParameterType.Number`). A value the service adds
+later is kept as its raw number or string, for example `new TemplateState("archived")`, and never
+fails parsing.
+
+## Webhooks
 
 ```csharp
-foreach (var item in result.Receptors)
-{
-    Console.WriteLine(item.ErrorCode is { } error
-        ? $"{item.Receptor}: rejected ({error})"
-        : $"{item.Receptor}: {item.MessageStatus?.ToString() ?? item.Status.ToString()}");
-}
-```
-
-## Rate limits
-
-Codes `2035` (`MessageLimitReached`) and `2036` (`RequestLimitReached`) — and a bare HTTP `429` with an
-unparseable body — surface as `AdsefidRateLimitException` (which derives from `AdsefidApiException`).
-
-## Enums
-
-| Enum | Namespace |
-|---|---|
-| `LineSelector` | `Adsefid.Sdk.Enums` |
-| `WebServiceMessageStatus` | `Adsefid.Sdk.Enums` |
-| `WebServiceResponseCode` | `Adsefid.Sdk.Enums` |
-| `TemplateState` | `Adsefid.Sdk.Enums` |
-| `TemplateParameterType` | `Adsefid.Sdk.Enums` |
-
-`AdsefidApiException.Code` is parsed permissively: an unrecognized numeric code becomes
-`(WebServiceResponseCode)rawInt` instead of throwing, so the SDK degrades gracefully as the API adds
-new codes over time. `TemplateParameterType` covers the documented set only — the live service also
-emits an undocumented third value, and such a parameter is dropped from `UserTemplate.Parameters`
-rather than surfaced as an enum member that does not exist.
-
-## Template parameters, leading zeros and decimals
-
-`TemplateParameterValue` holds either a string or a number, with implicit conversions from
-`string`, `int`, `long`, `decimal`, and `double`. A parameter the template declares as `number` may
-be sent **either** as a JSON number or as a JSON string, and the service substitutes a numeric
-string verbatim — so a string is the only way to keep a value's exact digits:
-
-```csharp
-await client.Sms.SendTemplateAsync(new SendTemplateSmsRequest
-{
-    TemplateId = "invoice_notice",
-    Parameters = new Dictionary<string, TemplateParameterValue>
-    {
-        ["invoice"] = "001234", // renders as 001234 — the number 1234 would lose the zeros
-        ["amount"]  = "1.50",   // renders as 1.50   — the number 1.5 would lose the zero
-        ["count"]   = 2,        // an ordinary integer
-        ["rate"]    = 19.99m,   // a decimal, which round-trips exactly
-    },
-    Receptor = "09120000000",
-    LineNumber = "983000XXX",
-});
-```
-
-Numbers are held as `decimal`, so an ordinary decimal survives a round trip that `double` would
-have perturbed; reading one back gives `value.AsNumber`, and a string gives `value.AsString`. Reach
-for a string whenever the rendered text must match the digits you supplied — invoice and account
-numbers, zero-padded codes, and money amounts with a fixed number of decimal places.
-
-A `default(TemplateParameterValue)` was never assigned and is not a usable value: serializing one
-throws rather than silently emitting JSON `null`.
-
-See [`examples/Templates`](examples/Templates) for a runnable version.
-
-## File upload example
-
-```csharp
-using var fileStream = File.OpenRead("brochure.pdf");
-var upload = await client.Messenger.UploadFileAsync(fileStream, "brochure.pdf", "application/pdf");
-
-await client.Messenger.SendSingleAsync(new SendSingleMessengerRequest
-{
-    Message = "See attached brochure",
-    Receptor = "98912****567",
-    Profile = profileId,
-    FileId = upload.FileId,
-});
-```
-
-The service enforces its documented MIME allowlist and 15 MB limit. Oversized uploads return
-`FileTooLarge` (2047, HTTP 413).
-
-## Webhook verification
-
-```csharp
-using Adsefid.Sdk.Webhooks;
-
-var app = WebApplication.Create();
-
 app.MapPost("/webhooks/adsefid", async (HttpRequest request) =>
 {
-    // Verify the exact bytes the service signed; do not let a JSON body reader touch them first.
     using var buffer = new MemoryStream();
-    await request.Body.CopyToAsync(buffer);
+    await request.Body.CopyToAsync(buffer); // verify the exact bytes, before any JSON parsing
     var rawBody = buffer.ToArray();
-
-    var signature = request.Headers[WebhookHeaderNames.Signature].ToString();
-    var timestamp = request.Headers[WebhookHeaderNames.Timestamp].ToString();
 
     WebhookEvent webhookEvent;
     try
     {
         webhookEvent = WebhookVerifier.VerifyAndParse(
             rawBody,
-            signature,
-            timestamp,
+            request.Headers[WebhookHeaderNames.Signature].ToString(),
+            request.Headers[WebhookHeaderNames.Timestamp].ToString(),
             secret: Environment.GetEnvironmentVariable("ADSEFID_WEBHOOK_SECRET")!);
     }
     catch (AdsefidWebhookVerificationException)
     {
-        return Results.Unauthorized();
+        return Results.Unauthorized(); // do not say why
     }
 
     switch (webhookEvent)
     {
         case ReceiveWebhookEvent receive:
-            foreach (var item in receive.Data)
-            {
-                Console.WriteLine($"Inbound SMS from {item.Sender}: {item.Message}");
-            }
+            foreach (var item in receive.Data) Console.WriteLine($"SMS from {item.Sender}: {item.Message}");
             break;
-
         case StatusWebhookEvent status:
-            foreach (var item in status.Data)
-            {
-                Console.WriteLine($"SMS {item.Id} -> {item.StatusDelivery}");
-            }
+            foreach (var item in status.Data) Console.WriteLine($"SMS {item.Id} -> {item.StatusDelivery}");
             break;
-
-        case MessengerStatusWebhookEvent messengerStatus:
-            foreach (var item in messengerStatus.Data)
-            {
-                Console.WriteLine($"Messenger message {item.Id} -> {item.StatusDelivery}");
-            }
+        case MessengerStatusWebhookEvent messenger:
+            foreach (var item in messenger.Data) Console.WriteLine($"Messenger {item.Id} -> {item.StatusDelivery}");
             break;
     }
 
     return Results.Ok();
 });
-
-app.Run();
 ```
 
-`VerifyAndParse` throws `AdsefidWebhookVerificationException` for a bad signature, a stale timestamp
-(default max age: 5 minutes, override via the `maxAge` parameter), or a malformed payload. Signature
-verification uses `CryptographicOperations.FixedTimeEquals` for constant-time comparison.
+The panel shows the signing secret Base64-encoded, and the service signs with the decoded bytes.
+Pass the secret exactly as shown; `VerifyAndParse` decodes it. If you store the decoded key, use
+the `ReadOnlySpan<byte>` overload. An empty secret or key is always rejected. A stale timestamp
+(default five minutes, change it with `maxAge`) or a bad signature throws
+`AdsefidWebhookVerificationException`.
 
-`WebhookHeaderNames` (`Id`, `Signature`, `Timestamp`, `Event`, `Attempt`) exposes every header name
-as a constant, so you never have to type `"X-Atlas-Webhook-Signature"` yourself.
-`WebhookEventTypes` (`Receive`, `Status`, `MessengerStatus`) does the same for the `type` values.
+`WebhookHeaderNames` and `WebhookEventTypes` hold the exact wire names. Each endpoint only
+receives the event types you subscribed it to in the panel. Deliveries can repeat, so make your
+handler idempotent and return a 2xx quickly.
 
-You configure, per webhook endpoint, which event types it receives (in your adsefid.com panel) —
-an endpoint subscribed only to `receive` will never see a `StatusWebhookEvent` arrive, so don't
-assume every deployment gets all three; handle whichever ones you've subscribed to.
+## Using this SDK with coding agents
 
-A runnable minimal API version of this is in [`examples/WebhookReceiver`](examples/WebhookReceiver).
+[AGENTS.md](AGENTS.md) holds the repository rules. These points prevent most wrong guesses:
 
-### The signing secret is Base64
+- Pass the API key and webhook secret explicitly. The SDK reads no environment variables.
+- Treat a bulk or P2P response as data, not an error. Check each item's status.
+- Send exact numeric text (`"001234"`, `"1.50"`) as a string `TemplateParameterValue`.
+- Give `VerifyAndParse` the raw request bytes, never re-serialized JSON.
+- There are no retries and no automatic batching. Split large requests yourself.
+- Catch `AdsefidRateLimitException` before `AdsefidApiException`, and branch on `Code`.
 
-Your endpoint's signing secret is shown in the adsefid.com panel as the Base64 encoding of 32
-random bytes, and the service signs with **those raw bytes** — not with the text of the Base64
-string. Pass the secret exactly as the panel shows it and `WebhookVerifier.VerifyAndParse` decodes
-it for you; a secret that is not valid Base64 throws `AdsefidWebhookVerificationException`. If you
-already hold the decoded key, use the overload that takes a `ReadOnlySpan<byte>`.
+## Examples and contributing
 
-## Development
-
-```bash
-make deps    # dotnet restore
-make fmt     # dotnet format
-make lint    # dotnet format --verify-no-changes --severity warn
-make build   # dotnet build -c Release
-make test    # dotnet test -c Release --no-build
-```
-
-The suite is xUnit, under `tests/Adsefid.Sdk.Tests`. It drives the public `AdsefidClient` through a
-fake `HttpMessageHandler` supplied via `AdsefidClientOptions.HttpClient`, and reaches the internal
-pure helpers (`Validation`, `CsvHelper`, `Limits`) through `InternalsVisibleTo`. Golden fixtures
-under `tests/Adsefid.Sdk.Tests/fixtures` are byte-identical to the same tree in the sibling SDK
-repositories, and `FixturesIntegrityTests` verifies them against `CHECKSUMS.txt`.
-
-### Examples
-
-Every directory under `examples/` is a runnable console project, excluded from the NuGet package
-via `<IsPackable>false</IsPackable>`:
+Each directory under `examples/` is a console project excluded from the NuGet package: `Account`,
+`Quickstart`, `BulkAndP2P`, `Templates`, `StatusAndCancel`, `Messenger` and `WebhookReceiver`.
+`Account` sends nothing, so try it first.
 
 ```bash
 export ADSEFID_API_KEY=...
-export ADSEFID_LINE_NUMBER=983000XXX
-
-dotnet run --project examples/Account          # account info, lines, profiles, templates; client config
-dotnet run --project examples/Quickstart       # send one SMS, with full error triage
-dotnet run --project examples/BulkAndP2P       # bulk + P2P sends, and reading a partial success
-dotnet run --project examples/Templates        # list templates and send one, incl. exact numeric values
-dotnet run --project examples/StatusAndCancel  # delivery status, cancelling, inbound messages
-dotnet run --project examples/Messenger        # upload an attachment and send it via a messenger profile
-dotnet run --project examples/WebhookReceiver  # verify and dispatch inbound webhooks
+export ADSEFID_LINE_NUMBER=983000
+dotnet run --project examples/Quickstart
 ```
 
-`examples/Account` sends nothing, so it is the safest one to try first.
+To work on the SDK: `make lint`, `make build` and `make test`. See [AGENTS.md](AGENTS.md).
 
-## Versioning
+## Versioning and license
 
-This SDK follows Semantic Versioning independently of the API documentation.
-
-- Core SDK version: **`0.6.0`** (`Adsefid.Sdk`)
-- Dependency injection package version: **`0.2.0`** (`Adsefid.Sdk.DependencyInjection`)
-- Verified API documentation: **`v1.14.0`**
-
-Core releases use `v<SDK_VERSION>` tags. Dependency injection releases use
-`dependency-injection-v<PACKAGE_VERSION>` tags. Package versions and API documentation versions
-move independently.
-
-## License
-
-MIT — see [LICENSE](LICENSE).
+Semantic Versioning, independent of the API documentation. Core package **0.6.0**, dependency
+injection package **0.2.0**. Core releases use `v<version>` tags and the DI package uses
+`dependency-injection-v<version>`. See [CHANGELOG.md](CHANGELOG.md). MIT licensed, see
+[LICENSE](LICENSE).

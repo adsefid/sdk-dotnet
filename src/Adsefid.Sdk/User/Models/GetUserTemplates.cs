@@ -26,7 +26,6 @@ public sealed class UserTemplate
 
     /// <summary>The template's named parameters and their expected value type, keyed by parameter name.</summary>
     [JsonPropertyName("parameters")]
-    [JsonConverter(typeof(Adsefid.Sdk.Json.TemplateParameterTypesJsonConverter))]
     public required IReadOnlyDictionary<string, TemplateParameterType> Parameters { get; init; }
 
     [JsonPropertyName("state")]

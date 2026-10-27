@@ -1,4 +1,5 @@
 ﻿using Adsefid.Sdk;
+using Adsefid.Sdk.Enums;
 using Adsefid.Sdk.Exceptions;
 using Adsefid.Sdk.Sms.Models;
 
@@ -11,8 +12,10 @@ try
 {
     var result = await client.Sms.SendSingleAsync(new SendSingleSmsRequest
     {
-        Receptor = "98912****567",
-        LineNumber = "983000XXX",
+        Receptor = "989120000000",
+        LineNumber = "983000",
+        // Required when your account has several lines with this number; see client.User.GetLinesAsync().
+        LineSelector = LineSelector.BulkServiceSendBased,
         Message = "Hello from Adsefid.Sdk",
         LocalId = "quickstart-example",
     });

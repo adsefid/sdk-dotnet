@@ -12,6 +12,15 @@ internal static class Limits
     /// <summary>Maximum Messenger message length, in UTF-16 code units.</summary>
     public const int MessengerMessageMaxLength = 4000;
 
+    /// <summary>Maximum Messenger file content, in bytes: 15 MiB, inclusive. Multipart framing is not counted.</summary>
+    public const long MessengerFileMaxBytes = 15L * 1024 * 1024;
+
+    /// <summary>
+    /// Longest path-and-query the SDK sends. The service sits behind a proxy that rejects request
+    /// lines over 8 KiB with an HTML 414, so a GET with a very long id list is refused locally.
+    /// </summary>
+    public const int RequestTargetMaxLength = 8000;
+
     /// <summary>Maximum combined count of distinct message ids and local ids in one lookup.</summary>
     public const int CombinedStatusIdsMax = 2000;
 

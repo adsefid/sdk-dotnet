@@ -80,6 +80,11 @@ public static class WebhookVerifier
         ArgumentNullException.ThrowIfNull(signatureHeader);
         ArgumentNullException.ThrowIfNull(timestampHeader);
 
+        if (key.IsEmpty)
+        {
+            throw new AdsefidWebhookVerificationException("The webhook signing key is empty.");
+        }
+
         if (!long.TryParse(timestampHeader, NumberStyles.Integer, CultureInfo.InvariantCulture, out var timestampSeconds))
         {
             throw new AdsefidWebhookVerificationException("The webhook timestamp header is not a valid Unix timestamp.");
@@ -90,12 +95,11 @@ public static class WebhookVerifier
             throw new AdsefidWebhookVerificationException("The webhook signature header is missing the 'v1=' prefix.");
         }
 
-        var providedSignature = signatureHeader[SignaturePrefix.Length..];
-        var expectedSignature = ComputeSignature(timestampSeconds, rawBody, key);
+        var providedSignature = signatureHeader.AsSpan(SignaturePrefix.Length);
 
         // Signature first, then freshness: the sibling SDKs check in this order, so the same
         // request reports the same failure everywhere.
-        if (!SignaturesMatch(providedSignature, expectedSignature))
+        if (!SignatureMatches(providedSignature, timestampSeconds, rawBody, key))
         {
             throw new AdsefidWebhookVerificationException("The webhook signature is invalid.");
         }
@@ -205,30 +209,27 @@ public static class WebhookVerifier
         }
     }
 
-    private static string ComputeSignature(long timestampSeconds, ReadOnlySpan<byte> rawBody, ReadOnlySpan<byte> key)
+    private static bool SignatureMatches(
+        ReadOnlySpan<char> providedSignature,
+        long timestampSeconds,
+        ReadOnlySpan<byte> rawBody,
+        ReadOnlySpan<byte> key)
     {
-        var prefix = Encoding.UTF8.GetBytes(timestampSeconds.ToString(CultureInfo.InvariantCulture) + ".");
-        var signingInput = new byte[prefix.Length + rawBody.Length];
-        prefix.CopyTo(signingInput, 0);
-        rawBody.CopyTo(signingInput.AsSpan(prefix.Length));
-        var hash = HMACSHA256.HashData(key, signingInput);
-        return Convert.ToBase64String(hash);
-    }
+        Span<byte> expected = stackalloc byte[HMACSHA256.HashSizeInBytes];
+        Span<byte> prefix = stackalloc byte[32];
+        timestampSeconds.TryFormat(prefix, out var prefixLength, default, CultureInfo.InvariantCulture);
+        prefix[prefixLength++] = (byte)'.';
 
-    private static bool SignaturesMatch(string provided, string expected)
-    {
-        byte[] providedBytes;
-        byte[] expectedBytes;
-        try
+        using (var hmac = IncrementalHash.CreateHMAC(HashAlgorithmName.SHA256, key))
         {
-            providedBytes = Convert.FromBase64String(provided);
-            expectedBytes = Convert.FromBase64String(expected);
-        }
-        catch (FormatException)
-        {
-            return false;
+            hmac.AppendData(prefix[..prefixLength]);
+            hmac.AppendData(rawBody);
+            hmac.GetHashAndReset(expected);
         }
 
-        return providedBytes.Length == expectedBytes.Length && CryptographicOperations.FixedTimeEquals(providedBytes, expectedBytes);
+        Span<byte> provided = stackalloc byte[HMACSHA256.HashSizeInBytes];
+        return Convert.TryFromBase64Chars(providedSignature, provided, out var providedLength)
+            && providedLength == expected.Length
+            && CryptographicOperations.FixedTimeEquals(provided, expected);
     }
 }
