@@ -66,7 +66,7 @@ public sealed class UserResource
         var parts = new List<string>();
         if (state is not null)
         {
-            parts.Add($"state={Uri.EscapeDataString(ToQueryValue(state.Value))}");
+            parts.Add($"state={Uri.EscapeDataString(state.Value.ToString())}");
         }
 
         if (skip is not null)
@@ -85,12 +85,4 @@ public sealed class UserResource
             AdsefidJsonContext.Default.ResponseEnvelopeGetUserTemplatesResponse,
             cancellationToken).ConfigureAwait(false);
     }
-
-    private static string ToQueryValue(TemplateState state) => state switch
-    {
-        TemplateState.PendingApproval => "pendingapproval",
-        TemplateState.Approved => "approved",
-        TemplateState.Rejected => "rejected",
-        _ => throw new AdsefidValidationException($"Unsupported template state '{state}'."),
-    };
 }

@@ -47,19 +47,19 @@ public sealed class UserResourceTests
     }
 
     /// <summary>
-    /// The live service emits a parameter type this SDK does not model. Dropping the entry keeps
-    /// the typed dictionary honest rather than surfacing a value callers cannot switch on.
+    /// The live service emits a parameter type this SDK has no named member for. It must survive as
+    /// its raw value so a caller can see what the template needs.
     /// </summary>
     [Fact]
-    public async Task GetTemplatesDropsUndocumentedParameterTypes()
+    public async Task GetTemplatesPreservesUnknownParameterTypes()
     {
         var (client, _) = TestClient.RespondingWithFixture("envelopes/user.get_templates.unknown_type.json");
 
         var result = await client.User.GetTemplatesAsync();
 
         var parameters = result.Items[0].Parameters;
-        Assert.False(parameters.ContainsKey("link"));
-        Assert.Equal(2, parameters.Count);
+        Assert.Equal(new TemplateParameterType("future_type"), parameters["link"]);
+        Assert.Equal(3, parameters.Count);
     }
 
     [Fact]
@@ -96,5 +96,17 @@ public sealed class UserResourceTests
             () => client.User.GetTemplatesAsync(skip: skip, take: take));
 
         Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task GetTemplatesPreservesUnknownStates()
+    {
+        var (client, _) = TestClient.RespondingWith("""
+            {"status":"success","data":{"items":[{"template_id":"t","content":"c","parameters":{},"state":"archived","description":null,"created_at":"2026-09-02T10:30:00+03:30","updated_at":"2026-09-02T11:00:00+03:30"}],"total":1}}
+            """);
+
+        var result = await client.User.GetTemplatesAsync();
+
+        Assert.Equal(new TemplateState("archived"), result.Items[0].State);
     }
 }

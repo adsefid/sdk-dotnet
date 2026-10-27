@@ -90,4 +90,38 @@ public sealed class AdsefidClientTests
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => client.User.GetInfoAsync(cts.Token));
     }
+
+    [Theory]
+    [InlineData("https://api.test/webservice/api")]
+    [InlineData("https://api.test/webservice/api/")]
+    public async Task ABaseUrlPathIsKeptInFrontOfTheRoute(string baseUrl)
+    {
+        var handler = FakeHttpMessageHandler.Json("""{"status":"success","data":[]}""");
+        var client = new AdsefidClient(new AdsefidClientOptions { ApiKey = "k", BaseUrl = baseUrl, HttpClient = new HttpClient(handler) });
+
+        await client.User.GetLinesAsync();
+
+        Assert.Equal("/webservice/api/v1/user/lines", handler.Only.Uri.AbsolutePath);
+    }
+
+    [Theory]
+    [InlineData(210, true)]
+    [InlineData(230, false)]
+    [InlineData(2000, false)]
+    public async Task AStatusLookupThatCannotFitInAUrlIsRefusedLocally(int count, bool accepted)
+    {
+        var (client, handler) = TestClient.RespondingWith("""{"status":"success","data":{"receptors":[]}}""");
+        var ids = Enumerable.Range(0, count).Select(_ => Guid.NewGuid()).ToArray();
+
+        if (accepted)
+        {
+            await client.Sms.GetStatusAsync(ids);
+            Assert.DoesNotContain("%2C", handler.Only.Uri.Query, StringComparison.Ordinal);
+            return;
+        }
+
+        var exception = await Assert.ThrowsAsync<AdsefidValidationException>(() => client.Sms.GetStatusAsync(ids));
+        Assert.Contains("characters long", exception.Message, StringComparison.Ordinal);
+        Assert.Empty(handler.Requests);
+    }
 }

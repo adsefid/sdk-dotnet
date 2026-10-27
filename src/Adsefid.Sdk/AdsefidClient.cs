@@ -15,7 +15,9 @@ namespace Adsefid.Sdk;
 /// </summary>
 public sealed class AdsefidClient
 {
-    private static readonly HttpClient DefaultHttpClient = new();
+    // PooledConnectionLifetime lets a long-lived shared client notice DNS changes.
+    private static readonly HttpClient DefaultHttpClient = new(
+        new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(2) });
 
     /// <summary>Creates a client from the given <paramref name="options"/>.</summary>
     /// <exception cref="AdsefidValidationException">

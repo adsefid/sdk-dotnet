@@ -5,6 +5,7 @@
     <RootNamespace>Adsefid.Sdk</RootNamespace>
     <AssemblyName>Adsefid.Sdk</AssemblyName>
     <IsAotCompatible>true</IsAotCompatible>
+    <EnablePackageValidation>true</EnablePackageValidation>
   </PropertyGroup>
 
   <PropertyGroup>

@@ -19,13 +19,13 @@ public static class WebServiceCode
 
     /// <summary>The named <see cref="WebServiceMessageStatus"/> for <paramref name="code"/>, or <see langword="null"/> when it is an error code or a status this SDK does not know yet.</summary>
     public static WebServiceMessageStatus? AsMessageStatus(int code) =>
-        IsMessageStatus(code) && Enum.IsDefined(typeof(WebServiceMessageStatus), code)
+        IsMessageStatus(code) && Enum.IsDefined((WebServiceMessageStatus)code)
             ? (WebServiceMessageStatus)code
             : null;
 
     /// <summary>The named <see cref="WebServiceResponseCode"/> for <paramref name="code"/>, or <see langword="null"/> when it is a message status or an error code this SDK does not know yet.</summary>
     public static WebServiceResponseCode? AsErrorCode(int code) =>
-        IsErrorCode(code) && Enum.IsDefined(typeof(WebServiceResponseCode), code)
+        IsErrorCode(code) && Enum.IsDefined((WebServiceResponseCode)code)
             ? (WebServiceResponseCode)code
             : null;
 }

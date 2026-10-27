@@ -1,4 +1,4 @@
-﻿using System.Text;
+﻿using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 using Adsefid.Sdk.Enums;
@@ -27,7 +27,7 @@ internal sealed class RequestExecutor(HttpClient httpClient, Uri baseUri, string
         SendAsync(
             HttpMethod.Post,
             requestUri,
-            () => new StringContent(JsonSerializer.Serialize(body, requestTypeInfo), Encoding.UTF8, "application/json"),
+            () => JsonContent.Create(body, requestTypeInfo),
             responseTypeInfo,
             cancellationToken);
 
@@ -45,7 +45,15 @@ internal sealed class RequestExecutor(HttpClient httpClient, Uri baseUri, string
         JsonTypeInfo<ResponseEnvelope<TData>> responseTypeInfo,
         CancellationToken cancellationToken)
     {
-        using var request = new HttpRequestMessage(method, new Uri(baseUri, requestUri));
+        var basePath = baseUri.AbsolutePath.TrimEnd('/');
+        if (method == HttpMethod.Get && basePath.Length + requestUri.Length > Limits.RequestTargetMaxLength)
+        {
+            throw new AdsefidValidationException(
+                $"The request URL is {basePath.Length + requestUri.Length} characters long, over the {Limits.RequestTargetMaxLength} the service accepts; send fewer ids per call.");
+        }
+
+        // Concatenate rather than resolve: a rooted relative URI would discard the base path.
+        using var request = new HttpRequestMessage(method, new Uri(baseUri.GetLeftPart(UriPartial.Authority) + basePath + requestUri));
         request.Headers.Add("X-API-KEY", apiKey);
         request.Headers.TryAddWithoutValidation("User-Agent", userAgent);
         request.Headers.Accept.ParseAdd("application/json");
@@ -70,10 +78,10 @@ internal sealed class RequestExecutor(HttpClient httpClient, Uri baseUri, string
 
         using (response)
         {
-            string responseBody;
+            byte[] responseBody;
             try
             {
-                responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                responseBody = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is HttpRequestException or IOException)
             {
@@ -104,7 +112,7 @@ internal sealed class RequestExecutor(HttpClient httpClient, Uri baseUri, string
     // A 2xx body is parsed once, as the typed success envelope. Only when that does not yield a
     // success payload is the body re-read as an error envelope, so the happy path never parses twice.
     private static TData ParseSuccess<TData>(
-        string responseBody,
+        byte[] responseBody,
         JsonTypeInfo<ResponseEnvelope<TData>> responseTypeInfo,
         int httpStatusCode)
     {
@@ -136,7 +144,7 @@ internal sealed class RequestExecutor(HttpClient httpClient, Uri baseUri, string
         return envelope.Data;
     }
 
-    private static ApiErrorPayload? TryReadError(string responseBody)
+    private static ApiErrorPayload? TryReadError(byte[] responseBody)
     {
         try
         {

@@ -15,6 +15,9 @@ namespace Adsefid.Sdk.Messenger;
 /// </summary>
 public sealed class MessengerResource
 {
+    /// <summary>The largest file content <see cref="UploadFileAsync"/> accepts: 15 MiB (15,728,640 bytes), inclusive.</summary>
+    public const long MaxFileBytes = Limits.MessengerFileMaxBytes;
+
     private readonly RequestExecutor _executor;
 
     internal MessengerResource(RequestExecutor executor)
@@ -93,7 +96,13 @@ public sealed class MessengerResource
     /// <param name="fileName">The file name to report to the API.</param>
     /// <param name="contentType">The MIME type of the file (e.g. <c>"application/pdf"</c>).</param>
     /// <param name="cancellationToken">Cancels the request.</param>
-    /// <exception cref="AdsefidValidationException"><paramref name="fileName"/> or <paramref name="contentType"/> is empty.</exception>
+    /// <exception cref="AdsefidValidationException">
+    /// <paramref name="fileName"/> or <paramref name="contentType"/> is empty, <paramref name="contentType"/>
+    /// is not a valid media type, or a seekable <paramref name="fileStream"/> holds more than
+    /// <see cref="MaxFileBytes"/> bytes from its current position. The size of a non-seekable stream
+    /// cannot be known up front; the service rejects an oversized upload with
+    /// <see cref="Enums.WebServiceResponseCode.FileTooLarge"/>.
+    /// </exception>
     public async Task<UploadMessengerFileResponse> UploadFileAsync(
         Stream fileStream,
         string fileName,

@@ -10,6 +10,8 @@ using Adsefid.Sdk.Sms.Models;
 
 var apiKey = Environment.GetEnvironmentVariable("ADSEFID_API_KEY");
 var lineNumber = Environment.GetEnvironmentVariable("ADSEFID_LINE_NUMBER");
+// Needed when the number has several lines; the value is a LineSelector name.
+LineSelector? lineSelector = Enum.TryParse<LineSelector>(Environment.GetEnvironmentVariable("ADSEFID_LINE_SELECTOR"), out var selector) ? selector : null;
 if (string.IsNullOrEmpty(apiKey) || string.IsNullOrEmpty(lineNumber))
 {
     Console.Error.WriteLine("set ADSEFID_API_KEY and ADSEFID_LINE_NUMBER");
@@ -24,6 +26,7 @@ var client = new AdsefidClient(new AdsefidClientOptions { ApiKey = apiKey });
 var bulk = await client.Sms.SendBulkAsync(new SendBulkSmsRequest
 {
     LineNumber = lineNumber,
+    LineSelector = lineSelector,
     Message = "Scheduled maintenance tonight from 01:00 to 03:00.",
     Receptors =
     [
@@ -44,6 +47,7 @@ Console.WriteLine($"  status histogram: {string.Join(", ", bulk.Counts.Select(en
 var p2p = await client.Sms.SendP2PAsync(new SendP2PSmsRequest
 {
     LineNumber = lineNumber,
+    LineSelector = lineSelector,
     Messages =
     [
         new P2PSmsMessage { Receptor = "09120000000", Message = "Hi Ali, your order #1001 shipped.", LocalId = "ship-1001" },

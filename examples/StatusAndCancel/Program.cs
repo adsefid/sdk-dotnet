@@ -4,10 +4,13 @@
 // call; their combined distinct count may not exceed 2000, which the SDK checks
 // before making the request.
 using Adsefid.Sdk;
+using Adsefid.Sdk.Enums;
 using Adsefid.Sdk.Sms.Models;
 
 var apiKey = Environment.GetEnvironmentVariable("ADSEFID_API_KEY");
 var lineNumber = Environment.GetEnvironmentVariable("ADSEFID_LINE_NUMBER");
+// Needed when the number has several lines; the value is a LineSelector name.
+LineSelector? lineSelector = Enum.TryParse<LineSelector>(Environment.GetEnvironmentVariable("ADSEFID_LINE_SELECTOR"), out var selector) ? selector : null;
 if (string.IsNullOrEmpty(apiKey) || string.IsNullOrEmpty(lineNumber))
 {
     Console.Error.WriteLine("set ADSEFID_API_KEY and ADSEFID_LINE_NUMBER");
@@ -22,6 +25,7 @@ var sent = await client.Sms.SendSingleAsync(new SendSingleSmsRequest
 {
     Receptor = "09120000000",
     LineNumber = lineNumber,
+    LineSelector = lineSelector,
     Message = "This one is scheduled, and about to be cancelled.",
     SendTime = sendTime,
     LocalId = "demo-cancel-1",

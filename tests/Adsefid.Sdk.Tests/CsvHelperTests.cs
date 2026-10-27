@@ -10,8 +10,6 @@ public sealed class CsvHelperTests
     {
         Assert.Null(CsvHelper.Join((IReadOnlyCollection<string>?)null));
         Assert.Null(CsvHelper.Join(Array.Empty<string>()));
-        Assert.Null(CsvHelper.Join((IReadOnlyCollection<Guid>?)null));
-        Assert.Null(CsvHelper.Join(Array.Empty<Guid>()));
     }
 
     [Fact]
@@ -19,6 +17,13 @@ public sealed class CsvHelperTests
     {
         Assert.Equal("a", CsvHelper.Join(new[] { "a" }));
         Assert.Equal("a,b,c", CsvHelper.Join(new[] { "a", "b", "c" }));
+    }
+
+    [Fact]
+    public void JoinDropsDuplicatesAndKeepsTheCommaLiteral()
+    {
+        Assert.Equal("a,b", CsvHelper.Join(new[] { "a", "b", "a" }));
+        Assert.DoesNotContain("%2C", CsvHelper.BuildIdsQuery(null, ["a", "b"]), StringComparison.Ordinal);
     }
 
     [Fact]

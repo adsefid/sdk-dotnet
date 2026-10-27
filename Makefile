@@ -7,5 +7,5 @@ lint:
 	dotnet format --verify-no-changes --severity warn
 build:
 	dotnet build -c Release
-test:
+test: build
 	dotnet test -c Release --no-build

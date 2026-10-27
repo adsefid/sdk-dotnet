@@ -2,6 +2,7 @@
 using System.Text.Json;
 using Adsefid.Sdk.Enums;
 using Adsefid.Sdk.Exceptions;
+using Adsefid.Sdk.Messenger;
 using Adsefid.Sdk.Messenger.Models;
 using Adsefid.Sdk.Models.Common;
 using Adsefid.Sdk.Tests.Infrastructure;
@@ -152,5 +153,83 @@ public sealed class MessengerResourceTests
         await Assert.ThrowsAsync<AdsefidValidationException>(() => call(client));
 
         Assert.True(handler.Requests.Count == 0, $"{name} must be rejected before reaching the network");
+    }
+
+    [Fact]
+    public async Task UploadFileLeavesTheCallersStreamOpen()
+    {
+        var (client, _) = TestClient.RespondingWithFixture("envelopes/messenger.upload_file.success.json");
+        using var stream = new MemoryStream([1, 2, 3]);
+
+        await client.Messenger.UploadFileAsync(stream, "a.png", "image/png");
+
+        Assert.True(stream.CanRead);
+    }
+
+    [Theory]
+    [InlineData("not a media type")]
+    [InlineData("image/png; x=")]
+    public async Task UploadFileRejectsAnInvalidContentType(string contentType)
+    {
+        var (client, handler) = TestClient.RespondingWithFixture("envelopes/messenger.upload_file.success.json");
+        using var stream = new MemoryStream([1]);
+
+        await Assert.ThrowsAsync<AdsefidValidationException>(() => client.Messenger.UploadFileAsync(stream, "a.png", contentType));
+        Assert.Empty(handler.Requests);
+    }
+
+    [Theory]
+    [InlineData(MessengerResource.MaxFileBytes, true)]
+    [InlineData(MessengerResource.MaxFileBytes + 1, false)]
+    public async Task UploadFileEnforcesTheFileSizeLimit(long length, bool accepted)
+    {
+        var (client, handler) = TestClient.RespondingWithFixture("envelopes/messenger.upload_file.success.json");
+        using var stream = new SparseStream(length);
+
+        if (accepted)
+        {
+            await client.Messenger.UploadFileAsync(stream, "a.mp4", "video/mp4");
+            return;
+        }
+
+        await Assert.ThrowsAsync<AdsefidValidationException>(() => client.Messenger.UploadFileAsync(stream, "a.mp4", "video/mp4"));
+        Assert.Empty(handler.Requests);
+    }
+
+    private sealed class SparseStream(long length) : Stream
+    {
+        private long _position;
+
+        public override bool CanRead => true;
+
+        public override bool CanSeek => true;
+
+        public override bool CanWrite => false;
+
+        public override long Length => length;
+
+        public override long Position
+        {
+            get => _position;
+            set => _position = value;
+        }
+
+        public override void Flush()
+        {
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            var read = (int)Math.Min(count, length - _position);
+            Array.Clear(buffer, offset, read);
+            _position += read;
+            return read;
+        }
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 }
