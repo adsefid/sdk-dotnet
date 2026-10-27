@@ -10,7 +10,7 @@
 
   <PropertyGroup>
     <PackageId>Adsefid.Sdk.DependencyInjection</PackageId>
-    <Version>0.2.0</Version>
+    <Version>1.0.0</Version>
     <Description>Microsoft.Extensions.DependencyInjection integration for Adsefid.Sdk.</Description>
     <Authors>adsefid.com</Authors>
     <PackageTags>adsefid;sms;messenger;webservice;sdk;dependency-injection</PackageTags>
