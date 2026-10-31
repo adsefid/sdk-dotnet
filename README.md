@@ -300,6 +300,6 @@ To work on the SDK: `make lint`, `make build` and `make test`. See [AGENTS.md](A
 ## Versioning and license
 
 Semantic Versioning, independent of the API documentation. Core package **1.1.0**, dependency
-injection package **1.0.0**. Core releases use `v<version>` tags and the DI package uses
+injection package **1.1.0**. Core releases use `v<version>` tags and the DI package uses
 `dependency-injection-v<version>`. See [CHANGELOG.md](CHANGELOG.md). MIT licensed, see
 [LICENSE](LICENSE).
