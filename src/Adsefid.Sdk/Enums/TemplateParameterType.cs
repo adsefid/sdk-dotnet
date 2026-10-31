@@ -4,7 +4,7 @@ using Adsefid.Sdk.Json;
 namespace Adsefid.Sdk.Enums;
 
 /// <summary>
-/// The declared type of one template parameter. The documented public set is { string, number }.
+/// The declared type of one template parameter. The public named types are { string, number }.
 /// A type this SDK does not know yet is preserved as its raw <see cref="Value"/> instead of
 /// failing to parse.
 /// </summary>

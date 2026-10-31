@@ -43,7 +43,7 @@ public sealed class UserResourceTests
         Assert.Equal(TemplateState.Approved, item.State);
         Assert.Equal(TemplateParameterType.String, item.Parameters["OTPCode"]);
         Assert.Equal(TemplateParameterType.Number, item.Parameters["amount"]);
-        Assert.Null(item.Description);
+        Assert.Equal(string.Empty, item.Description);
     }
 
     /// <summary>
@@ -60,6 +60,7 @@ public sealed class UserResourceTests
         var parameters = result.Items[0].Parameters;
         Assert.Equal(new TemplateParameterType("future_type"), parameters["link"]);
         Assert.Equal(3, parameters.Count);
+        Assert.Null(result.Items[0].Description);
     }
 
     [Fact]

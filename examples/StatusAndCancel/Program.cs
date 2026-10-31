@@ -47,7 +47,7 @@ var cancelled = await client.Sms.CancelAsync(new CancelSmsRequest { MessageIds =
 Console.WriteLine($"\ncancelled {cancelled.CancelledMessages.Count}, failed to cancel {cancelled.FailedToCancel.Count}");
 foreach (var item in cancelled.FailedToCancel)
 {
-    Console.WriteLine($"  {item.MessageId} could not be cancelled: {item.Status}");
+    Console.WriteLine($"  {item.MessageId?.ToString() ?? item.LocalId} could not be cancelled: {item.ErrorCode?.ToString() ?? item.MessageStatus?.ToString() ?? item.Status.ToString()}");
 }
 
 // Inbound messages. count must be 1..499; since filters by arrival time.

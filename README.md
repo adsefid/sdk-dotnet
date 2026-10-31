@@ -9,7 +9,7 @@ messages, reads inbound SMS, looks up account data, and verifies signed webhooks
 
 The core package targets `net8.0`, has no dependencies beyond the BCL, and uses a source-generated
 `System.Text.Json` context, so it works with trimming and Native AOT. It is verified against API
-documentation **v1.14.0**. Sibling SDKs exist for Go, JavaScript, PHP and Python with the same
+documentation **v1.15.0**. Sibling SDKs exist for Go, JavaScript, PHP and Python with the same
 shape.
 
 ## Install
@@ -48,7 +48,7 @@ across threads.
 
 **Line selector.** An account can own several lines with the same number, each with its own
 selector (see `client.User.GetLinesAsync()`). When it does, `LineSelector` is required on every SMS
-send; without it the service answers `LineNotFound`.
+send; without it the service answers `InvalidLineSelector`.
 
 ## Configuration
 
@@ -90,14 +90,16 @@ Every method is async, takes an optional `CancellationToken`, and returns the ty
 | Resource | Methods | Endpoint |
 |---|---|---|
 | `client.Sms` | `SendSingleAsync`, `SendBulkAsync`, `SendP2PAsync`, `SendTemplateAsync` | `POST /v1/sms/{single,bulk,p2p,template}` |
-| `client.Sms` | `GetStatusAsync(messageIds?, localIds?)`, `CancelAsync`, `GetReceivedAsync(lineNumber, count?, since?)` | `GET /v1/sms/status`, `POST /v1/sms/cancel`, `GET /v1/sms/receive` |
+| `client.Sms` | `GetStatusAsync(messageIds?, localIds?)`, `CancelAsync`, `GetReceivedAsync(lineNumber, count?, since?)` | `QUERY /v1/sms/status`, `POST /v1/sms/cancel`, `GET /v1/sms/receive` |
 | `client.Messenger` | `SendSingleAsync`, `SendBulkAsync`, `SendP2PAsync`, `SendTemplateAsync` | `POST /v1/messenger/{single,bulk,p2p,template}` |
 | `client.Messenger` | `UploadFileAsync(stream, fileName, contentType)` | `POST /v1/messenger/file` |
-| `client.Messenger` | `GetStatusAsync(messageIds?, localIds?)`, `CancelAsync` | `GET /v1/messenger/status`, `POST /v1/messenger/cancel` |
+| `client.Messenger` | `GetStatusAsync(messageIds?, localIds?)`, `CancelAsync` | `QUERY /v1/messenger/status`, `POST /v1/messenger/cancel` |
 | `client.User` | `GetInfoAsync`, `GetLinesAsync`, `GetProfilesAsync`, `GetTemplatesAsync(state?, skip?, take?)` | `GET /v1/user/{info,lines,profiles,templates}` |
 
 Cancel accepts messages that are awaiting approval, queued or scheduled, with no refund, and at
-most 2,000 distinct IDs across both lists. Status lookups are GET requests, so the URL caps them at about 200 IDs per call. The SDK raises a validation error past 8,000 URL characters instead of letting the gateway answer HTTP 414.
+most 2,000 distinct IDs across both lists. Status lookups use `QUERY` with JSON arrays, supporting up to 2,000 distinct IDs in one request.
+Unmatched cancellation IDs appear in `failed_to_cancel` with error codes 2046 or 2029; a missing
+local ID match has a null message ID. Check each item's status or error code.
 
 ## Bulk and P2P: partial success is not an error
 
@@ -208,7 +210,7 @@ catch (AdsefidTransportException ex)
 ```
 
 A non-2xx response with no error envelope has code `-1` and name `UNKNOWN_ERROR`. A bare 429 has
-code 2036 and name `RATE_LIMITED`. `Details.Errors` maps field names (or rejected cancel IDs) to
+code 2036 and name `RATE_LIMITED`. `Details.Errors` maps field names to
 `{ Code, Name }`, and `Details.Items` carries indexed bulk/P2P errors. The SDK sends each request
 once and never retries. Add backoff in your own `HttpClient` handler if you need it.
 

@@ -1,6 +1,7 @@
 ﻿using Adsefid.Sdk.Exceptions;
 using Adsefid.Sdk.Http;
 using Adsefid.Sdk.Json;
+using Adsefid.Sdk.Models.Common;
 using Adsefid.Sdk.Sms.Models;
 
 namespace Adsefid.Sdk.Sms;
@@ -37,7 +38,8 @@ public sealed class SmsResource
         Validation.RequireMaxLength(request.Message, Limits.SmsMessageMaxLength, nameof(request.Message));
         Validation.ValidateLocalId(request.LocalId, nameof(request.LocalId));
 
-        return await _executor.PostJsonAsync(
+        return await _executor.SendJsonAsync(
+            HttpMethod.Post,
             "/v1/sms/single",
             request,
             AdsefidJsonContext.Default.SendSingleSmsRequest,
@@ -60,7 +62,8 @@ public sealed class SmsResource
         Validation.RequireMaxLength(request.Message, Limits.SmsMessageMaxLength, nameof(request.Message));
         Validation.RequireNonEmpty(request.LineNumber, nameof(request.LineNumber));
 
-        return await _executor.PostJsonAsync(
+        return await _executor.SendJsonAsync(
+            HttpMethod.Post,
             "/v1/sms/bulk",
             request,
             AdsefidJsonContext.Default.SendBulkSmsRequest,
@@ -80,7 +83,8 @@ public sealed class SmsResource
         Validation.RequireNonEmptyCollection(request.Messages, nameof(request.Messages));
         Validation.RequireNonEmpty(request.LineNumber, nameof(request.LineNumber));
 
-        return await _executor.PostJsonAsync(
+        return await _executor.SendJsonAsync(
+            HttpMethod.Post,
             "/v1/sms/p2p",
             request,
             AdsefidJsonContext.Default.SendP2PSmsRequest,
@@ -102,7 +106,8 @@ public sealed class SmsResource
         Validation.RequireNonEmpty(request.LineNumber, nameof(request.LineNumber));
         Validation.ValidateLocalId(request.LocalId, nameof(request.LocalId));
 
-        return await _executor.PostJsonAsync(
+        return await _executor.SendJsonAsync(
+            HttpMethod.Post,
             "/v1/sms/template",
             request,
             AdsefidJsonContext.Default.SendTemplateSmsRequest,
@@ -110,7 +115,7 @@ public sealed class SmsResource
             cancellationToken).ConfigureAwait(false);
     }
 
-    /// <summary>Looks up delivery status for previously sent messages, by <paramref name="messageIds"/> and/or <paramref name="localIds"/>. <c>GET /v1/sms/status</c>.</summary>
+    /// <summary>Looks up delivery status for previously sent messages, by <paramref name="messageIds"/> and/or <paramref name="localIds"/>. <c>QUERY /v1/sms/status</c>.</summary>
     /// <exception cref="AdsefidValidationException">
     /// Both <paramref name="messageIds"/> and <paramref name="localIds"/> are empty, or their
     /// combined count exceeds 2000.
@@ -130,9 +135,15 @@ public sealed class SmsResource
             Limits.CombinedStatusIdsMax,
             "The combined count of 'messageIds' and 'localIds' must not exceed 2000.");
 
-        var query = CsvHelper.BuildIdsQuery(messageIds, localIds);
-        return await _executor.GetAsync(
-            $"/v1/sms/status{query}",
+        return await _executor.SendJsonAsync(
+            new HttpMethod("QUERY"),
+            "/v1/sms/status",
+            new StatusRequest
+            {
+                MessageIds = messageIds is { Count: > 0 } ? messageIds.Distinct().ToArray() : null,
+                LocalIds = localIds is { Count: > 0 } ? localIds.Distinct(StringComparer.Ordinal).ToArray() : null,
+            },
+            AdsefidJsonContext.Default.StatusRequest,
             AdsefidJsonContext.Default.ResponseEnvelopeGetSmsStatusResponse,
             cancellationToken).ConfigureAwait(false);
     }
@@ -152,7 +163,8 @@ public sealed class SmsResource
             Limits.CombinedCancelIdsMax,
             $"The combined distinct count of 'MessageIds' and 'LocalIds' must not exceed {Limits.CombinedCancelIdsMax}.");
 
-        return await _executor.PostJsonAsync(
+        return await _executor.SendJsonAsync(
+            HttpMethod.Post,
             "/v1/sms/cancel",
             request,
             AdsefidJsonContext.Default.CancelSmsRequest,
