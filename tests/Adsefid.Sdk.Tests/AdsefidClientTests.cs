@@ -1,4 +1,6 @@
 ﻿using Adsefid.Sdk.Exceptions;
+using Adsefid.Sdk.Messenger.Models;
+using Adsefid.Sdk.Sms.Models;
 using Adsefid.Sdk.Tests.Infrastructure;
 using Xunit;
 
@@ -81,14 +83,29 @@ public sealed class AdsefidClientTests
         Assert.Equal("my-app/2.1", handler.Only.Headers["User-Agent"]);
     }
 
-    [Fact]
-    public async Task ACancelledTokenSurfacesAsOperationCanceled()
+    [Theory]
+    [InlineData("user-info")]
+    [InlineData("sms-cancel")]
+    [InlineData("messenger-cancel")]
+    [InlineData("sms-status")]
+    [InlineData("messenger-status")]
+    public async Task ACancelledTokenSurfacesAsOperationCanceled(string operation)
     {
-        var (client, _) = TestClient.RespondingWithFixture("envelopes/user.get_info.success.json");
+        var (client, handler) = TestClient.RespondingWithFixture("envelopes/user.get_info.success.json");
         using var cts = new CancellationTokenSource();
         await cts.CancelAsync();
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => client.User.GetInfoAsync(cts.Token));
+        Func<Task> call = operation switch
+        {
+            "sms-cancel" => () => client.Sms.CancelAsync(new CancelSmsRequest { LocalIds = ["id"] }, cts.Token),
+            "messenger-cancel" => () => client.Messenger.CancelAsync(new CancelMessengerRequest { LocalIds = ["id"] }, cts.Token),
+            "sms-status" => () => client.Sms.GetStatusAsync(localIds: ["id"], cancellationToken: cts.Token),
+            "messenger-status" => () => client.Messenger.GetStatusAsync(localIds: ["id"], cancellationToken: cts.Token),
+            _ => () => client.User.GetInfoAsync(cts.Token),
+        };
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(call);
+        Assert.Empty(handler.Requests);
     }
 
     [Theory]
@@ -105,23 +122,34 @@ public sealed class AdsefidClientTests
     }
 
     [Theory]
-    [InlineData(210, true)]
-    [InlineData(230, false)]
-    [InlineData(2000, false)]
-    public async Task AStatusLookupThatCannotFitInAUrlIsRefusedLocally(int count, bool accepted)
+    [InlineData(0)]
+    [InlineData(2000)]
+    [InlineData(2001)]
+    public async Task StatusUsesAQueryBodyWithTheCombinedDistinctLimit(int count)
     {
-        var (client, handler) = TestClient.RespondingWith("""{"status":"success","data":{"receptors":[]}}""");
-        var ids = Enumerable.Range(0, count).Select(_ => Guid.NewGuid()).ToArray();
-
-        if (accepted)
+        foreach (var area in new[] { "sms", "messenger" })
         {
-            await client.Sms.GetStatusAsync(ids);
-            Assert.DoesNotContain("%2C", handler.Only.Uri.Query, StringComparison.Ordinal);
-            return;
+            var (client, handler) = TestClient.RespondingWith("""{"status":"success","data":{"receptors":[]}}""");
+            var ids = Enumerable.Range(0, count / 2).Select(_ => Guid.NewGuid()).ToArray();
+            var locals = Enumerable.Range(0, count - count / 2).Select(i => $"id-{i}").ToArray();
+            Func<Task> call = area == "sms"
+                ? () => client.Sms.GetStatusAsync(ids.Concat(ids).ToArray(), locals)
+                : () => client.Messenger.GetStatusAsync(ids.Concat(ids).ToArray(), locals);
+            if (count is 0 or > 2000)
+            {
+                await Assert.ThrowsAsync<AdsefidValidationException>(call);
+                Assert.Empty(handler.Requests);
+            }
+            else
+            {
+                await call();
+                Assert.Equal("QUERY", handler.Only.Method.Method);
+                Assert.Equal($"/v1/{area}/status", handler.Only.Uri.AbsolutePath);
+                Assert.Empty(handler.Only.Uri.Query);
+                using var body = System.Text.Json.JsonDocument.Parse(handler.Only.Body);
+                Assert.Equal(ids, body.RootElement.GetProperty("message_ids").EnumerateArray().Select(id => id.GetGuid()));
+                Assert.Equal(locals, body.RootElement.GetProperty("local_ids").EnumerateArray().Select(id => id.GetString()));
+            }
         }
-
-        var exception = await Assert.ThrowsAsync<AdsefidValidationException>(() => client.Sms.GetStatusAsync(ids));
-        Assert.Contains("characters long", exception.Message, StringComparison.Ordinal);
-        Assert.Empty(handler.Requests);
     }
 }

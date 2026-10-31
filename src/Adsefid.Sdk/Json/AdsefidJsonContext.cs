@@ -24,6 +24,7 @@ namespace Adsefid.Sdk.Json;
 [JsonSerializable(typeof(SendTemplateSmsRequest))]
 [JsonSerializable(typeof(ResponseEnvelope<SendTemplateSmsResponse>))]
 [JsonSerializable(typeof(ResponseEnvelope<GetSmsStatusResponse>))]
+[JsonSerializable(typeof(StatusRequest))]
 [JsonSerializable(typeof(CancelSmsRequest))]
 [JsonSerializable(typeof(ResponseEnvelope<CancelSmsResponse>))]
 [JsonSerializable(typeof(ResponseEnvelope<GetReceivedSmsResponse>))]

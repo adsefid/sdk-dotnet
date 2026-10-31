@@ -50,4 +50,33 @@ public sealed class CancellationTests
             }
         }
     }
+    [Theory]
+    [InlineData("sms")]
+    [InlineData("messenger")]
+    public async Task CancellationPreservesNullableIdsAndItemErrors(string area)
+    {
+        var (client, _) = TestClient.RespondingWithFixture("envelopes/cancel.partial_success.json");
+        if (area == "sms")
+        {
+            var result = await client.Sms.CancelAsync(new CancelSmsRequest { LocalIds = ["missing-local"] });
+            Assert.Equal(Adsefid.Sdk.Enums.WebServiceMessageStatus.Canceled, result.CancelledMessages[0].MessageStatus);
+            Assert.Equal(new[] { 1001, 2046, 2029, 2999 }, result.FailedToCancel.Select(item => item.Status));
+            Assert.Null(result.FailedToCancel[1].LocalId);
+            Assert.Null(result.FailedToCancel[2].MessageId);
+            Assert.Equal(Adsefid.Sdk.Enums.WebServiceResponseCode.InvalidMessageIds, result.FailedToCancel[1].ErrorCode);
+            Assert.Equal(Adsefid.Sdk.Enums.WebServiceResponseCode.InvalidLocalIds, result.FailedToCancel[2].ErrorCode);
+            Assert.Null(result.FailedToCancel[3].ErrorCode);
+        }
+        else
+        {
+            var result = await client.Messenger.CancelAsync(new CancelMessengerRequest { LocalIds = ["missing-local"] });
+            Assert.Equal(Adsefid.Sdk.Enums.WebServiceMessageStatus.Canceled, result.CancelledMessages[0].MessageStatus);
+            Assert.Equal(new[] { 1001, 2046, 2029, 2999 }, result.FailedToCancel.Select(item => item.Status));
+            Assert.Null(result.FailedToCancel[1].LocalId);
+            Assert.Null(result.FailedToCancel[2].MessageId);
+            Assert.Equal(Adsefid.Sdk.Enums.WebServiceResponseCode.InvalidMessageIds, result.FailedToCancel[1].ErrorCode);
+            Assert.Equal(Adsefid.Sdk.Enums.WebServiceResponseCode.InvalidLocalIds, result.FailedToCancel[2].ErrorCode);
+            Assert.Null(result.FailedToCancel[3].ErrorCode);
+        }
+    }
 }

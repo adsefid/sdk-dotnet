@@ -214,7 +214,7 @@ public sealed class SmsResourceTests
     }
 
     [Fact]
-    public async Task GetStatusJoinsIdsIntoCsvQueryParams()
+    public async Task GetStatusSendsAQueryJsonBody()
     {
         var (client, handler) = TestClient.RespondingWithFixture("envelopes/sms.get_status.success.json");
         var messageId = Guid.NewGuid();
@@ -222,11 +222,12 @@ public sealed class SmsResourceTests
         await client.Sms.GetStatusAsync([messageId], ["l1"]);
 
         var request = handler.Only;
-        Assert.Equal(HttpMethod.Get, request.Method);
+        Assert.Equal("QUERY", request.Method.Method);
         Assert.Equal("/v1/sms/status", request.Uri.AbsolutePath);
-        var query = System.Web.HttpUtility.ParseQueryString(request.Uri.Query);
-        Assert.Equal(messageId.ToString(), query["message_ids"]);
-        Assert.Equal("l1", query["local_ids"]);
+        Assert.Empty(request.Uri.Query);
+        using var body = System.Text.Json.JsonDocument.Parse(request.Body);
+        Assert.Equal(messageId, body.RootElement.GetProperty("message_ids")[0].GetGuid());
+        Assert.Equal("l1", body.RootElement.GetProperty("local_ids")[0].GetString());
     }
 
     [Fact]

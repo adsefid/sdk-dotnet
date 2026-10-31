@@ -2,6 +2,7 @@
 using Adsefid.Sdk.Http;
 using Adsefid.Sdk.Json;
 using Adsefid.Sdk.Messenger.Models;
+using Adsefid.Sdk.Models.Common;
 
 namespace Adsefid.Sdk.Messenger;
 
@@ -40,7 +41,8 @@ public sealed class MessengerResource
         Validation.RequireNonEmpty(request.Profile, nameof(request.Profile));
         Validation.ValidateLocalId(request.LocalId, nameof(request.LocalId));
 
-        return await _executor.PostJsonAsync(
+        return await _executor.SendJsonAsync(
+            HttpMethod.Post,
             "/v1/messenger/single",
             request,
             AdsefidJsonContext.Default.SendSingleMessengerRequest,
@@ -62,7 +64,8 @@ public sealed class MessengerResource
         Validation.RequireMaxLength(request.Message, Limits.MessengerMessageMaxLength, nameof(request.Message));
         Validation.RequireNonEmpty(request.Profile, nameof(request.Profile));
 
-        return await _executor.PostJsonAsync(
+        return await _executor.SendJsonAsync(
+            HttpMethod.Post,
             "/v1/messenger/bulk",
             request,
             AdsefidJsonContext.Default.SendBulkMessengerRequest,
@@ -81,7 +84,8 @@ public sealed class MessengerResource
         Validation.RequireNonEmptyCollection(request.Receptors, nameof(request.Receptors));
         Validation.RequireNonEmpty(request.Profile, nameof(request.Profile));
 
-        return await _executor.PostJsonAsync(
+        return await _executor.SendJsonAsync(
+            HttpMethod.Post,
             "/v1/messenger/p2p",
             request,
             AdsefidJsonContext.Default.SendP2PMessengerRequest,
@@ -136,7 +140,8 @@ public sealed class MessengerResource
             Limits.CombinedCancelIdsMax,
             $"The combined distinct count of 'MessageIds' and 'LocalIds' must not exceed {Limits.CombinedCancelIdsMax}.");
 
-        return await _executor.PostJsonAsync(
+        return await _executor.SendJsonAsync(
+            HttpMethod.Post,
             "/v1/messenger/cancel",
             request,
             AdsefidJsonContext.Default.CancelMessengerRequest,
@@ -157,7 +162,8 @@ public sealed class MessengerResource
         Validation.RequireNonEmpty(request.Profile, nameof(request.Profile));
         Validation.ValidateLocalId(request.LocalId, nameof(request.LocalId));
 
-        return await _executor.PostJsonAsync(
+        return await _executor.SendJsonAsync(
+            HttpMethod.Post,
             "/v1/messenger/template",
             request,
             AdsefidJsonContext.Default.SendTemplateMessengerRequest,
@@ -165,7 +171,7 @@ public sealed class MessengerResource
             cancellationToken).ConfigureAwait(false);
     }
 
-    /// <summary>Looks up delivery status for previously sent Messenger messages, by <paramref name="messageIds"/> and/or <paramref name="localIds"/>. <c>GET /v1/messenger/status</c>.</summary>
+    /// <summary>Looks up delivery status for previously sent Messenger messages, by <paramref name="messageIds"/> and/or <paramref name="localIds"/>. <c>QUERY /v1/messenger/status</c>.</summary>
     /// <exception cref="AdsefidValidationException">
     /// Both <paramref name="messageIds"/> and <paramref name="localIds"/> are empty, or their
     /// combined count exceeds 2000.
@@ -185,9 +191,15 @@ public sealed class MessengerResource
             Limits.CombinedStatusIdsMax,
             "The combined count of 'messageIds' and 'localIds' must not exceed 2000.");
 
-        var query = CsvHelper.BuildIdsQuery(messageIds, localIds);
-        return await _executor.GetAsync(
-            $"/v1/messenger/status{query}",
+        return await _executor.SendJsonAsync(
+            new HttpMethod("QUERY"),
+            "/v1/messenger/status",
+            new StatusRequest
+            {
+                MessageIds = messageIds is { Count: > 0 } ? messageIds.Distinct().ToArray() : null,
+                LocalIds = localIds is { Count: > 0 } ? localIds.Distinct(StringComparer.Ordinal).ToArray() : null,
+            },
+            AdsefidJsonContext.Default.StatusRequest,
             AdsefidJsonContext.Default.ResponseEnvelopeGetMessengerStatusResponse,
             cancellationToken).ConfigureAwait(false);
     }

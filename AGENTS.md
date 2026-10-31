@@ -13,9 +13,9 @@ Equivalent SDKs exist for the same API in sibling repositories (`sdk-js`, `sdk-p
 The API surface (endpoints, field names, types, validation rules, enums, example payloads, webhook
 behavior) is defined by the published adsefid.com SMS Web Service API documentation.
 
-**Pin: this SDK is built against doc version `v1.14.0`.** Re-read the relevant section of that
+**Pin: this SDK is built against doc version `v1.15.0`.** Re-read the relevant section of that
 documentation before changing any endpoint, request/response model, or enum. If the doc has moved on
-since `v1.14.0`, diff it against what's implemented here before trusting either side.
+since `v1.15.0`, diff it against what's implemented here before trusting either side.
 
 Each package follows independent Semantic Versioning from its project `<Version>`; never copy the
 API-document version into package metadata. Record package and API-document versions in the README.
@@ -33,14 +33,14 @@ an ambiguous doc reading:
   dropped or thrown on. Add a named member only for a value the documentation lists. See
   `Enums/TemplateParameterType.cs`.
 - `error.details` uses the shared typed `ApiErrorDetails` shape: optional `Errors` maps field names
-  (or rejected cancel IDs) to `{Code,Name}`, and optional `Items` carries indexed bulk/P2P errors.
+  to `{Code,Name}`, and optional `Items` carries indexed bulk/P2P errors.
   Keep numeric codes forward-compatible.
 - `line_selector` is required when the account has two or more lines with the same number. Without
-  it the service answers `LINE_NOT_FOUND` (2002), even for a number the account owns.
-- GET requests are capped at 8,000 characters of path and query. The service's proxy answers an HTML
-  HTTP 414 above 8 KiB, so the documented 2,000-ID status lookup cannot be sent as one GET (about 200
-  IDs fit). The SDK joins IDs with literal commas, drops duplicates, and refuses an oversized GET
-  locally with its validation error. Cancel is a POST and is not affected.
+  it the service answers `INVALID_LINE_SELECTOR` (2017) on `line_selector`. A selector that matches
+  no line returns `LINE_NOT_FOUND` (2002).
+- Status lookups use `QUERY` with JSON arrays, with at most 2,000 distinct message/local IDs
+  combined. Unmatched cancellation IDs stay in `failed_to_cancel` with status 2046 or 2029;
+  a missing local ID match has a null message ID. Preserve unknown per-item codes.
 - Timestamps carry up to 7 fractional digits (`2026-09-19T11:43:10.4030292+03:30`) and mixed offsets;
   parsers must accept both.
 - Bulk/P2P item validation happens in the API. Validate request-level fields locally, but send item
@@ -69,11 +69,13 @@ an ambiguous doc reading:
 3. Add the method to the relevant resource class (`SmsResource`, `MessengerResource`, or
    `UserResource`): validate the doc-stated simple client-side constraints first (required fields,
    max lengths, count limits — see `Http/Validation.cs`), then call `_executor.GetAsync` /
-   `PostJsonAsync` / `PostMultipartAsync`.
+   `SendJsonAsync` / `PostMultipartAsync`.
 4. Update the resource-reference table in `README.md`.
 
 ## Hard rules
 
+- **All enums must preserve unknown wire values.** Keep raw integers/strings without raising
+  errors for unnamed values.
 - **Every change ships with tests.** `tests/Adsefid.Sdk.Tests` is xUnit (`make test`). Transport
   behaviour is driven through the public `AdsefidClient` with a fake `HttpMessageHandler` supplied
   via `AdsefidClientOptions.HttpClient`; the internal pure helpers (`Validation`, `CsvHelper`,

@@ -18,14 +18,15 @@ internal sealed class RequestExecutor(HttpClient httpClient, Uri baseUri, string
         CancellationToken cancellationToken) =>
         SendAsync(HttpMethod.Get, requestUri, contentFactory: null, responseTypeInfo, cancellationToken);
 
-    public Task<TData> PostJsonAsync<TRequest, TData>(
+    public Task<TData> SendJsonAsync<TRequest, TData>(
+        HttpMethod method,
         string requestUri,
         TRequest body,
         JsonTypeInfo<TRequest> requestTypeInfo,
         JsonTypeInfo<ResponseEnvelope<TData>> responseTypeInfo,
         CancellationToken cancellationToken) =>
         SendAsync(
-            HttpMethod.Post,
+            method,
             requestUri,
             () => JsonContent.Create(body, requestTypeInfo),
             responseTypeInfo,
